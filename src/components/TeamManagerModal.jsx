@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink } from 'lucide-react';
+import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle } from 'lucide-react';
 import RoleManagerModal from './RoleManagerModal';
 
 export default function TeamManagerModal({ 
@@ -20,6 +20,7 @@ export default function TeamManagerModal({
   const [inviteRole, setInviteRole] = useState(availableRoles[0]?.name || 'Developer');
   const [inviteSuccessMsg, setInviteSuccessMsg] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Edit member role state
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
@@ -40,9 +41,11 @@ export default function TeamManagerModal({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleSendGmailInvite = (e) => {
+  const handleSendGmailInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
+
+    setSendingEmail(true);
 
     const newMember = {
       name: inviteName.trim() || inviteEmail.split('@')[0],
@@ -59,23 +62,33 @@ export default function TeamManagerModal({
       onAddActivity(`Mengundang ${newMember.name} (${newMember.email}) sebagai ${selectedRoleName}`);
     }
 
-    // Open Real Gmail Web Composer with prefilled email & invite link
-    const subject = encodeURIComponent(`Undangan Bergabung ke Proyek: ${activeProject.name}`);
+    // Prepare Email Content
+    const subject = encodeURIComponent(`Undangan Akses Bergabung Proyek: ${activeProject.name}`);
     const bodyText = encodeURIComponent(
-      `Halo,\n\nAnda diundang untuk bergabung ke dalam proyek "${activeProject.name}" sebagai ${selectedRoleName}.\n\nKlik link di bawah ini untuk mengakses ruang kerja proyek:\n${inviteLink}\n\nSalam,\nTim ${activeProject.name}`
+      `Halo ${newMember.name},\n\nAnda diundang untuk bergabung ke dalam proyek "${activeProject.name}" sebagai ${selectedRoleName}.\n\nKlik link di bawah ini untuk mengakses ruang kerja proyek:\n${inviteLink}\n\nSalam,\nTim ${activeProject.name}`
     );
     
+    // Fallback Gmail Web Composer
     const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inviteEmail.trim())}&su=${subject}&body=${bodyText}`;
+    
+    // Auto Copy Invite Link to Clipboard for User Convenience
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+    } catch (err) {}
+
+    // Open Web Composer in a new tab so user can click 'Send' directly
     window.open(gmailWebUrl, '_blank');
 
-    setInviteSuccessMsg(`Undangan ditambahkan! Gmail composer telah dibuka untuk mengirikan email ke ${inviteEmail}.`);
+    setSendingEmail(false);
+    setInviteSuccessMsg(`✓ Anggota ditambahkan ke proyek & link undangan telah disalin! Tab Gmail composer telah dibuka.`);
     setInviteEmail('');
     setInviteName('');
     
     setTimeout(() => {
       setInviteSuccessMsg('');
       setActiveTab('list');
-    }, 2500);
+    }, 3500);
   };
 
   const handleRemoveMember = (index) => {
@@ -255,9 +268,16 @@ export default function TeamManagerModal({
           </div>
         )}
 
-        {/* Tab 2: Invite via Gmail Form & Real Link Generator */}
+        {/* Tab 2: Invite via Gmail Form & Direct Link Generator */}
         {activeTab === 'invite' && (
           <form onSubmit={handleSendGmailInvite}>
+            <div style={{ background: 'var(--g-blue-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '14px', fontSize: '0.8rem', color: 'var(--g-blue)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>Cara Pengiriman Undangan:</strong> Klik tombol di bawah akan membuka tab draf Gmail berisi link akses proyek. Anda juga bisa menyalin link undangan fisik secara manual untuk dikirim via WA/Chat.
+              </div>
+            </div>
+
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>
                 Alamat Email Gmail Anggota
@@ -337,8 +357,8 @@ export default function TeamManagerModal({
               <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('list')}>
                 Kembali ke Daftar Tim
               </button>
-              <button type="submit" className="btn btn-primary">
-                <Send size={16} /> Kirim via Gmail Web
+              <button type="submit" className="btn btn-primary" disabled={sendingEmail}>
+                <Send size={16} /> {sendingEmail ? 'Memproses...' : 'Buka Gmail & Kirim Undangan'}
               </button>
             </div>
           </form>
