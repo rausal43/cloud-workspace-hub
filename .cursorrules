@@ -4,3 +4,4 @@
 - Rule 3: Keep services in `src/services/`, custom hooks in `src/hooks/`, and UI components in `src/components/`.
 - Rule 4: All API keys and secrets MUST be read from `.env` environment variables ONLY.
 - Rule 5: Always link task assignees, authors, and event participants to `activeProject.members` (Gmail invited team).
+- Rule 6: Always use `isMatchProject` (ID + Name fallback) when filtering items per project across multi-client environments.

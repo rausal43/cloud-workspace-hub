@@ -17,3 +17,7 @@
 4. **DYNAMIC GMAIL TEAM MEMBER INTEGRATION**:
    - ALL features requiring assignees, authors, or participants (Task Manager, Calendar, Standups, Messages, Files) MUST dynamically populate options from `activeProject.members` (invited Gmail team members).
    - NEVER hardcode static default names in forms; fallback to `currentUser.name` or the first member of `activeProject.members`.
+
+5. **CROSS-CLIENT PROJECT MATCHING BY ID & NAME**:
+   - ALL project filtering logic for tasks, messages, chat, files, events, and checkins MUST use flexible project matching (`item.projectId === activeProject.id` OR project name fallback).
+   - `setActiveProject` on cloud data load MUST match existing active project by `id` OR `name` to unify team member project instances.
