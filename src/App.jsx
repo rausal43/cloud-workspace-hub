@@ -43,10 +43,13 @@ const INITIAL_ROLES = [
   { id: 'role-viewer', name: 'Viewer', level: 'Read-Only', canEdit: false, canDelete: false, canInvite: false, canManageProject: false, color: '#80868b' }
 ];
 
+// Shared Public Cloud Realtime Endpoint for instant multi-device sync
+const CLOUD_SYNC_URL = 'https://cloud-workspace-hub-default-rtdb.firebaseio.com/workspace.json';
+
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // User & Auth State (Persisted in LocalStorage permanently across refreshes)
+  // User & Auth State
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('hub_currentUser');
     if (savedUser) {
@@ -127,7 +130,91 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Firebase Realtime Listener if db is connected
+  // Push full application state to Global Cloud Store
+  const pushToCloud = async (overrideState = {}) => {
+    const payload = {
+      projects: overrideState.projects || projects,
+      messages: overrideState.messages || messages,
+      todos: overrideState.todos || todos,
+      chatMessages: overrideState.chatMessages || chatMessages,
+      files: overrideState.files || files,
+      events: overrideState.events || events,
+      checkins: overrideState.checkins || checkins,
+      activities: overrideState.activities || activities,
+      updatedAt: Date.now()
+    };
+
+    try {
+      await fetch(CLOUD_SYNC_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {}
+
+    if (db) {
+      try {
+        (payload.projects || []).forEach(p => setDoc(doc(db, 'projects', p.id), p, { merge: true }));
+      } catch (e) {}
+    }
+  };
+
+  // Pull live data from Global Cloud Store across all devices worldwide
+  useEffect(() => {
+    const pullFromCloud = async () => {
+      try {
+        const res = await fetch(CLOUD_SYNC_URL);
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+              setProjects(data.projects);
+              localStorage.setItem('hub_projects', JSON.stringify(data.projects));
+              setActiveProject(prev => {
+                if (!prev) return data.projects[0];
+                const found = data.projects.find(p => p.id === prev.id);
+                return found || data.projects[0];
+              });
+            }
+            if (data.messages && Array.isArray(data.messages)) {
+              setMessages(data.messages);
+              localStorage.setItem('hub_messages', JSON.stringify(data.messages));
+            }
+            if (data.todos && Array.isArray(data.todos)) {
+              setTodos(data.todos);
+              localStorage.setItem('hub_todos', JSON.stringify(data.todos));
+            }
+            if (data.chatMessages && Array.isArray(data.chatMessages)) {
+              setChatMessages(data.chatMessages);
+              localStorage.setItem('hub_chat', JSON.stringify(data.chatMessages));
+            }
+            if (data.files && Array.isArray(data.files)) {
+              setFiles(data.files);
+              localStorage.setItem('hub_files', JSON.stringify(data.files));
+            }
+            if (data.events && Array.isArray(data.events)) {
+              setEvents(data.events);
+              localStorage.setItem('hub_events', JSON.stringify(data.events));
+            }
+            if (data.checkins && Array.isArray(data.checkins)) {
+              setCheckins(data.checkins);
+              localStorage.setItem('hub_checkins', JSON.stringify(data.checkins));
+            }
+            if (data.activities && Array.isArray(data.activities)) {
+              setActivities(data.activities);
+              localStorage.setItem('hub_activities', JSON.stringify(data.activities));
+            }
+          }
+        }
+      } catch (e) {}
+    };
+
+    pullFromCloud();
+    const interval = setInterval(pullFromCloud, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Firestore Realtime Listener fallback if db is connected
   useEffect(() => {
     if (!db) return;
 
@@ -135,29 +222,6 @@ export default function App() {
       if (!snapshot.empty) {
         const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setProjects(cloudProj);
-        localStorage.setItem('hub_projects', JSON.stringify(cloudProj));
-        setActiveProject(prev => {
-          if (!prev) return cloudProj[0];
-          const updated = cloudProj.find(p => p.id === prev.id);
-          return updated || cloudProj[0];
-        });
-      }
-    });
-
-    const unsubActivities = onSnapshot(collection(db, 'activities'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudAct = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        cloudAct.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setActivities(cloudAct);
-        localStorage.setItem('hub_activities', JSON.stringify(cloudAct));
-      }
-    });
-
-    const unsubTodos = onSnapshot(collection(db, 'todos'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudTodos = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setTodos(cloudTodos);
-        localStorage.setItem('hub_todos', JSON.stringify(cloudTodos));
       }
     });
 
@@ -165,52 +229,20 @@ export default function App() {
       if (!snapshot.empty) {
         const cloudMsg = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setMessages(cloudMsg);
-        localStorage.setItem('hub_messages', JSON.stringify(cloudMsg));
       }
     });
 
     const unsubChat = onSnapshot(collection(db, 'chatMessages'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudChat = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        cloudChat.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         setChatMessages(cloudChat);
-        localStorage.setItem('hub_chat', JSON.stringify(cloudChat));
-      }
-    });
-
-    const unsubEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudEvents = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setEvents(cloudEvents);
-        localStorage.setItem('hub_events', JSON.stringify(cloudEvents));
-      }
-    });
-
-    const unsubFiles = onSnapshot(collection(db, 'files'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudFiles = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setFiles(cloudFiles);
-        localStorage.setItem('hub_files', JSON.stringify(cloudFiles));
-      }
-    });
-
-    const unsubCheckins = onSnapshot(collection(db, 'checkins'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudCheck = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setCheckins(cloudCheck);
-        localStorage.setItem('hub_checkins', JSON.stringify(cloudCheck));
       }
     });
 
     return () => {
       unsubProjects();
-      unsubActivities();
-      unsubTodos();
       unsubMessages();
       unsubChat();
-      unsubEvents();
-      unsubFiles();
-      unsubCheckins();
     };
   }, []);
 
@@ -223,80 +255,47 @@ export default function App() {
       time: 'Baru saja',
       createdAt: Date.now()
     };
-    setActivities(prev => [newAct, ...prev]);
-    localStorage.setItem('hub_activities', JSON.stringify([newAct, ...activities]));
-
-    if (db) {
-      try {
-        await setDoc(doc(db, 'activities', newAct.id), newAct);
-      } catch (err) {}
-    }
+    const updatedActs = [newAct, ...activities];
+    setActivities(updatedActs);
+    localStorage.setItem('hub_activities', JSON.stringify(updatedActs));
+    pushToCloud({ activities: updatedActs });
   };
 
-  // State sync wrapper functions for child modules (Instant local updates)
-  const handleUpdateMessages = async (newMessagesList, updatedItem = null, isDelete = false) => {
+  // State sync wrapper functions for child modules (Instant local + cloud sync)
+  const handleUpdateMessages = async (newMessagesList) => {
     setMessages(newMessagesList);
     localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) await deleteDoc(doc(db, 'messages', updatedItem.id));
-        else await setDoc(doc(db, 'messages', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ messages: newMessagesList });
   };
 
-  const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
+  const handleUpdateTodos = async (newTodosList) => {
     setTodos(newTodosList);
     localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) await deleteDoc(doc(db, 'todos', updatedItem.id));
-        else await setDoc(doc(db, 'todos', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ todos: newTodosList });
   };
 
-  const handleUpdateChatMessages = async (newChatList, updatedItem = null) => {
+  const handleUpdateChatMessages = async (newChatList) => {
     setChatMessages(newChatList);
     localStorage.setItem('hub_chat', JSON.stringify(newChatList));
-    if (db && updatedItem) {
-      try {
-        await setDoc(doc(db, 'chatMessages', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ chatMessages: newChatList });
   };
 
-  const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
+  const handleUpdateEvents = async (newEventsList) => {
     setEvents(newEventsList);
     localStorage.setItem('hub_events', JSON.stringify(newEventsList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) await deleteDoc(doc(db, 'events', updatedItem.id));
-        else await setDoc(doc(db, 'events', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ events: newEventsList });
   };
 
-  const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
+  const handleUpdateFiles = async (newFilesList) => {
     setFiles(newFilesList);
     localStorage.setItem('hub_files', JSON.stringify(newFilesList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) await deleteDoc(doc(db, 'files', updatedItem.id));
-        else await setDoc(doc(db, 'files', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ files: newFilesList });
   };
 
-  const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
+  const handleUpdateCheckins = async (newCheckinsList) => {
     setCheckins(newCheckinsList);
     localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) await deleteDoc(doc(db, 'checkins', updatedItem.id));
-        else await setDoc(doc(db, 'checkins', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    pushToCloud({ checkins: newCheckinsList });
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -340,17 +339,10 @@ export default function App() {
 
         const finalProj = { ...targetProj, members: updatedMembers };
 
-        setProjects(prev => {
-          const exists = prev.some(p => p.id === finalProj.id);
-          return exists ? prev.map(p => p.id === finalProj.id ? finalProj : p) : [finalProj, ...prev];
-        });
+        const updatedProjects = projects.map(p => p.id === finalProj.id ? finalProj : p);
+        setProjects(updatedProjects);
         setActiveProject(finalProj);
-
-        if (db) {
-          try {
-            setDoc(doc(db, 'projects', finalProj.id), finalProj);
-          } catch (e) {}
-        }
+        pushToCloud({ projects: updatedProjects });
       }
     }
   }, [isDarkMode, currentUser]);
@@ -385,12 +377,7 @@ export default function App() {
     setProjDesc('');
     setShowNewProjectModal(false);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', newProject.id), newProject);
-      } catch (err) {}
-    }
-
+    pushToCloud({ projects: updatedProjects });
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -422,12 +409,7 @@ export default function App() {
     setActiveProject(updatedData);
     setShowEditProjectModal(false);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', activeProject.id), updatedData);
-      } catch (err) {}
-    }
-
+    pushToCloud({ projects: updatedProjects });
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
@@ -443,11 +425,7 @@ export default function App() {
     }
     setShowDeleteConfirmModal(false);
 
-    if (db) {
-      try {
-        await deleteDoc(doc(db, 'projects', deletedId));
-      } catch (err) {}
-    }
+    pushToCloud({ projects: remaining });
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
@@ -458,11 +436,7 @@ export default function App() {
     setProjects(updatedProjects);
     setActiveProject(updatedProj);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', activeProject.id), updatedProj);
-      } catch (err) {}
-    }
+    pushToCloud({ projects: updatedProjects });
   };
 
   const handleSelectProjectFromGlobal = (projId) => {
@@ -780,7 +754,7 @@ export default function App() {
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button className="btn btn-secondary" onClick={() => setShowDeleteConfirmModal(false)}>Batal</button>
-              <button className="btn btn-primary" onClickDeleteProject style={{ background: 'var(--g-red)' }}>
+              <button className="btn btn-primary" onClick={handleDeleteProject} style={{ background: 'var(--g-red)' }}>
                 Ya, Hapus Proyek
               </button>
             </div>
