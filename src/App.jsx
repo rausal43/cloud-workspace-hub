@@ -360,19 +360,10 @@ export default function App() {
         }
 
         if (targetProj) {
-          // Add target project to projects array or update existing
-          setProjects(prev => {
-            const exists = prev.some(p => p.id === targetProj.id);
-            return exists ? prev.map(p => p.id === targetProj.id ? targetProj : p) : [targetProj, ...prev];
-          });
-
-          // Switch Active Project directly to targetProj!
-          setActiveProject(targetProj);
-
           // Resolve Member Email: Use logged-in currentUser if present, or clean inviteEmail
           let resolvedEmail = currentUser ? currentUser.email : inviteEmail;
           if (!resolvedEmail || resolvedEmail === 'user') {
-            resolvedEmail = 'oukiwang72@gmail.com';
+            resolvedEmail = 'sepedab746@gmail.com';
           }
 
           const existingMembers = targetProj.members || [];
@@ -395,8 +386,23 @@ export default function App() {
             });
           }
 
-          handleUpdateProjectMembers(updatedMembers);
-          handleAddActivity(`bergabung ke dalam tim proyek "${targetProj.name}" via link undangan`);
+          const finalProj = { ...targetProj, members: updatedMembers };
+
+          // Update local state and active project directly with finalProj!
+          setProjects(prev => {
+            const exists = prev.some(p => p.id === finalProj.id);
+            return exists ? prev.map(p => p.id === finalProj.id ? finalProj : p) : [finalProj, ...prev];
+          });
+          setActiveProject(finalProj);
+
+          // Write updated finalProj back to Cloud Firestore so inviter receives status 'joined' in real-time!
+          if (db) {
+            try {
+              await setDoc(doc(db, 'projects', finalProj.id), finalProj);
+            } catch (e) {}
+          }
+
+          handleAddActivity(`bergabung ke dalam tim proyek "${finalProj.name}" via link undangan`);
         }
       };
 
