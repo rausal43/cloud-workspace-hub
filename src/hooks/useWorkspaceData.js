@@ -203,7 +203,11 @@ export function useWorkspaceData(currentUser) {
     setTodos(newList);
     localStorage.setItem('hub_todos', JSON.stringify(newList));
     broadcastSync({ todos: newList });
-    if (updatedItem) dbService.saveTodoToDb(updatedItem, isDelete);
+    if (updatedItem) {
+      dbService.saveTodoToDb(updatedItem, isDelete);
+    } else if (Array.isArray(newList)) {
+      newList.forEach(item => dbService.saveTodoToDb(item, false));
+    }
   };
 
   const handleUpdateChatMessages = async (newList, updatedItem = null, isDelete = false) => {

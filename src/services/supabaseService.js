@@ -19,7 +19,11 @@ const runQuery = async (queryPromise) => {
 // ==========================================
 export const fetchProjectsFromDb = async () => {
   const { data } = await runQuery(supabase.from('projects').select('*'));
-  return data || null;
+  if (!data) return null;
+  return data.map(item => ({
+    ...item,
+    members: Array.isArray(item.members) ? item.members : []
+  }));
 };
 
 export const saveProjectToDb = async (project, isDelete = false) => {
@@ -29,10 +33,10 @@ export const saveProjectToDb = async (project, isDelete = false) => {
   const row = {
     id: project.id,
     name: project.name,
-    description: project.description,
-    category: project.category,
-    color: project.color,
-    updatedAt: project.updatedAt,
+    description: project.description || '',
+    category: project.category || 'General',
+    color: project.color || '#1a73e8',
+    updatedAt: project.updatedAt || 'Baru saja',
     members: project.members || []
   };
   return await runQuery(supabase.from('projects').upsert(row));
@@ -43,7 +47,11 @@ export const saveProjectToDb = async (project, isDelete = false) => {
 // ==========================================
 export const fetchMessagesFromDb = async () => {
   const { data } = await runQuery(supabase.from('messages').select('*'));
-  return data || null;
+  if (!data) return null;
+  return data.map(item => ({
+    ...item,
+    comments: Array.isArray(item.comments) ? item.comments : []
+  }));
 };
 
 export const saveMessageToDb = async (message, isDelete = false) => {
@@ -67,24 +75,42 @@ export const saveMessageToDb = async (message, isDelete = false) => {
 };
 
 // ==========================================
-// 3. Todos Service
+// 3. Todos Service (Task Manager - Bulletproof Dual Schema Mapping)
 // ==========================================
 export const fetchTodosFromDb = async () => {
   const { data } = await runQuery(supabase.from('todos').select('*'));
-  return data || null;
+  if (!data) return null;
+  return data.map(item => ({
+    ...item,
+    categoryName: item.categoryName || item.title || 'General',
+    items: Array.isArray(item.items) ? item.items : []
+  }));
 };
 
 export const saveTodoToDb = async (todo, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('todos').delete().eq('id', todo.id));
   }
+  const catTitle = todo.categoryName || todo.title || 'General';
   const row = {
     id: todo.id,
     projectId: todo.projectId,
-    categoryName: todo.categoryName || todo.title || 'General',
+    categoryName: catTitle,
+    title: catTitle,
     items: todo.items || []
   };
-  return await runQuery(supabase.from('todos').upsert(row));
+
+  const res = await runQuery(supabase.from('todos').upsert(row));
+  if (res.error) {
+    const fallbackRow = {
+      id: todo.id,
+      projectId: todo.projectId,
+      title: catTitle,
+      items: todo.items || []
+    };
+    return await runQuery(supabase.from('todos').upsert(fallbackRow));
+  }
+  return res;
 };
 
 // ==========================================
@@ -130,8 +156,9 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
     name: fileItem.name,
     size: fileItem.size,
     type: fileItem.type,
-    uploader: fileItem.uploader,
-    date: fileItem.date,
+    uploader: fileItem.uploader || fileItem.author || 'User',
+    author: fileItem.author || fileItem.uploader || 'User',
+    date: fileItem.date || 'Hari ini',
     url: fileItem.url
   };
   return await runQuery(supabase.from('files').upsert(row));
@@ -155,7 +182,10 @@ export const saveEventToDb = async (eventItem, isDelete = false) => {
     title: eventItem.title,
     date: eventItem.date,
     time: eventItem.time,
-    category: eventItem.category
+    location: eventItem.location || 'Google Meet',
+    assignee: eventItem.assignee || 'Semua Anggota Tim',
+    color: eventItem.color || '#1a73e8',
+    completed: Boolean(eventItem.completed)
   };
   return await runQuery(supabase.from('events').upsert(row));
 };
@@ -165,7 +195,11 @@ export const saveEventToDb = async (eventItem, isDelete = false) => {
 // ==========================================
 export const fetchCheckinsFromDb = async () => {
   const { data } = await runQuery(supabase.from('checkins').select('*'));
-  return data || null;
+  if (!data) return null;
+  return data.map(item => ({
+    ...item,
+    responses: Array.isArray(item.responses) ? item.responses : []
+  }));
 };
 
 export const saveCheckinToDb = async (checkinItem, isDelete = false) => {
@@ -176,7 +210,8 @@ export const saveCheckinToDb = async (checkinItem, isDelete = false) => {
     id: checkinItem.id,
     projectId: checkinItem.projectId,
     question: checkinItem.question,
-    frequency: checkinItem.frequency,
+    schedule: checkinItem.schedule || checkinItem.frequency || 'Setiap hari kerja jam 16:30',
+    frequency: checkinItem.frequency || checkinItem.schedule || 'Setiap hari kerja jam 16:30',
     responses: checkinItem.responses || []
   };
   return await runQuery(supabase.from('checkins').upsert(row));
