@@ -45,6 +45,15 @@ const INITIAL_ROLES = [
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // User & Auth State (Persisted in LocalStorage)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUser = localStorage.getItem('hub_currentUser');
+    if (savedUser) {
+      try { return JSON.parse(savedUser); } catch (e) {}
+    }
+    return null;
+  });
+
   // Projects State
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('hub_projects');
@@ -63,16 +72,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // User & Auth State (Persisted in LocalStorage)
-  const [currentUser, setCurrentUser] = useState(() => {
-    const savedUser = localStorage.getItem('hub_currentUser');
-    if (savedUser) {
-      try { return JSON.parse(savedUser); } catch (e) {}
-    }
-    return null;
-  });
-
-  // Module States (Persisted in LocalStorage + Firestore Sync)
+  // Module States
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('hub_messages');
     return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
@@ -123,14 +123,28 @@ export default function App() {
   useEffect(() => {
     if (!db) return;
 
+    // Seed existing initial projects to Firestore so all users see the exact same projects
+    projects.forEach(async (p) => {
+      try {
+        await setDoc(doc(db, 'projects', p.id), p, { merge: true });
+      } catch (e) {}
+    });
+
     // 1. Projects Realtime Listener
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setProjects(cloudProj);
         localStorage.setItem('hub_projects', JSON.stringify(cloudProj));
+
+        // Auto-select project matching currentUser email or activeProject ID
         setActiveProject(prev => {
           if (!prev) return cloudProj[0];
+          // Check if user belongs to an invited project
+          if (currentUser && currentUser.email) {
+            const memberProj = cloudProj.find(p => (p.members || []).some(m => m.email?.toLowerCase() === currentUser.email?.toLowerCase()));
+            if (memberProj) return memberProj;
+          }
           const updated = cloudProj.find(p => p.id === prev.id);
           return updated || cloudProj[0];
         });
@@ -213,6 +227,16 @@ export default function App() {
       unsubCheckins();
     };
   }, []);
+
+  // Sync active project selection when currentUser changes
+  useEffect(() => {
+    if (currentUser && currentUser.email && projects.length > 0) {
+      const userProj = projects.find(p => (p.members || []).some(m => m.email?.toLowerCase() === currentUser.email?.toLowerCase()));
+      if (userProj) {
+        setActiveProject(userProj);
+      }
+    }
+  }, [currentUser]);
 
   // Persist LocalStorage Backups
   useEffect(() => {
@@ -347,7 +371,7 @@ export default function App() {
         setActiveProject(targetProj);
         // Check if member already in project
         const memberEmail = currentUser ? currentUser.email : (inviteEmail || 'guest@gmail.com');
-        const exists = (targetProj.members || []).some(m => m.email === memberEmail);
+        const exists = (targetProj.members || []).some(m => m.email?.toLowerCase() === memberEmail?.toLowerCase());
         if (!exists) {
           const newMember = {
             name: currentUser ? currentUser.name : (inviteEmail ? inviteEmail.split('@')[0] : 'Anggota Baru'),
@@ -428,7 +452,7 @@ export default function App() {
       } catch (err) {}
     }
 
-    handleAddActivity(`memperbarui informasi proyek`);
+    handleAddActivity(`memperbarui informasi proyek menjadi ${projName}`);
   };
 
   const handleDeleteProject = async () => {
