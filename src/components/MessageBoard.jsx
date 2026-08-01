@@ -361,7 +361,16 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
               fontSize: '0.8rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <img src={msg.authorAvatar} alt={msg.author} className="avatar" style={{ width: '26px', height: '26px' }} />
+                <img 
+                  src={msg.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.author || 'User')}&background=0D8ABC&color=fff&bold=true`} 
+                  alt={msg.author} 
+                  className="avatar" 
+                  style={{ width: '26px', height: '26px' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.author || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                  }}
+                />
                 <span style={{ fontWeight: 600 }}>{msg.author}</span>
               </div>
 

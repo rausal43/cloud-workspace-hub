@@ -192,7 +192,15 @@ export default function TeamManagerModal({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <img src={m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} alt={m.name} className="avatar" />
+                      <img 
+                        src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name || 'User')}&background=0D8ABC&color=fff&bold=true`} 
+                        alt={m.name} 
+                        className="avatar" 
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                        }}
+                      />
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {m.name}

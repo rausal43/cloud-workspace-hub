@@ -74,11 +74,15 @@ export default function ProjectDashboard({
               {members.map((m, idx) => (
                 <img
                   key={idx}
-                  src={m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
+                  src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name || 'User')}&background=0D8ABC&color=fff&bold=true`}
                   alt={m.name}
                   className="avatar"
                   title={`${m.name} (${m.role})`}
                   style={{ marginLeft: idx > 0 ? '-8px' : 0, zIndex: members.length - idx }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                  }}
                 />
               ))}
             </div>

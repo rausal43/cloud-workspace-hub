@@ -252,10 +252,14 @@ export default function Navbar({
                 }}
               >
                 <img
-                  src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
+                  src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'User')}&background=0D8ABC&color=fff&bold=true`}
                   alt={currentUser.name}
                   className="avatar"
                   style={{ width: '28px', height: '28px' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                  }}
                 />
                 <span className="badge-text-mobile-hide" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
                   {currentUser.name}
@@ -288,7 +292,15 @@ export default function Navbar({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                  <img src={currentUser.avatar} alt={currentUser.name} className="avatar" />
+                  <img 
+                    src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'User')}&background=0D8ABC&color=fff&bold=true`} 
+                    alt={currentUser.name} 
+                    className="avatar" 
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                    }}
+                  />
                   <div>
                     <div style={{ fontWeight: 800, fontSize: '0.88rem' }}>{currentUser.name}</div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{currentUser.email}</div>

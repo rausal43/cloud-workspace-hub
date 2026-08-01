@@ -227,7 +227,15 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '8px' }}>
             {chatMessages.map(msg => (
               <div key={msg.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <img src={msg.avatar} alt={msg.sender} className="avatar" />
+                <img 
+                  src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender || 'User')}&background=0D8ABC&color=fff&bold=true`} 
+                  alt={msg.sender} 
+                  className="avatar" 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                  }}
+                />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                     <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{msg.sender}</span>
