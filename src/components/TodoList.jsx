@@ -204,7 +204,7 @@ export default function TodoList({ todos, setTodos, activeProject, currentUser, 
       {/* Render List View */}
       {viewMode === 'list' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {todos.map(cat => {
+          {todos.filter(cat => !cat.projectId || cat.projectId === activeProject?.id).map(cat => {
             const completedCount = cat.items.filter(i => i.completed).length;
             const totalCount = cat.items.length;
             const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -330,7 +330,7 @@ export default function TodoList({ todos, setTodos, activeProject, currentUser, 
       {/* Render Kanban View */}
       {viewMode === 'kanban' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-          {todos.map(cat => (
+          {todos.filter(cat => !cat.projectId || cat.projectId === activeProject?.id).map(cat => (
             <div key={cat.id} className="glass-card" style={{ padding: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>{cat.categoryName}</h4>

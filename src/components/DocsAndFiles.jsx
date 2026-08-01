@@ -138,7 +138,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
 
       {/* Files Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-        {files.map(file => (
+        {files.filter(f => !f.projectId || f.projectId === activeProject?.id).map(file => (
           <div key={file.id} className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>

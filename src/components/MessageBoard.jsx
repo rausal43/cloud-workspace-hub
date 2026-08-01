@@ -27,10 +27,11 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
   const [commentText, setCommentText] = useState('');
 
   const filteredMessages = messages.filter(msg => {
+    const matchesProj = !msg.projectId || msg.projectId === activeProject?.id;
     const matchesCat = selectedCategory === 'Semua' || msg.category === selectedCategory;
     const matchesSearch = msg.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           msg.content.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesSearch;
+    return matchesProj && matchesCat && matchesSearch;
   });
 
   const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';

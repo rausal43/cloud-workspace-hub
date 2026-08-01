@@ -118,8 +118,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
     notify?.('Acara berhasil dihapus dari kalender', 'delete');
   };
 
-  // Filter events based on hideCompleted
+  // Filter events based on active project & hideCompleted
   const filteredEvents = events.filter(evt => {
+    if (evt.projectId && evt.projectId !== activeProject?.id) return false;
     if (hideCompleted && evt.completed) return false;
     return true;
   });

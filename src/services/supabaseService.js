@@ -5,6 +5,9 @@ const runQuery = async (queryPromise) => {
   if (!supabase) return { data: null, error: 'Supabase client not initialized' };
   try {
     const response = await queryPromise;
+    if (response.error) {
+      console.warn('Supabase DB Notice:', response.error.message);
+    }
     return response;
   } catch (err) {
     return { data: null, error: err.message };
@@ -23,7 +26,16 @@ export const saveProjectToDb = async (project, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('projects').delete().eq('id', project.id));
   }
-  return await runQuery(supabase.from('projects').upsert(project));
+  const row = {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    category: project.category,
+    color: project.color,
+    updatedAt: project.updatedAt,
+    members: project.members || []
+  };
+  return await runQuery(supabase.from('projects').upsert(row));
 };
 
 // ==========================================
@@ -38,7 +50,20 @@ export const saveMessageToDb = async (message, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('messages').delete().eq('id', message.id));
   }
-  return await runQuery(supabase.from('messages').upsert(message));
+  const row = {
+    id: message.id,
+    projectId: message.projectId,
+    title: message.title,
+    author: message.author,
+    authorAvatar: message.authorAvatar,
+    category: message.category,
+    date: message.date,
+    content: message.content,
+    commentsCount: message.commentsCount || 0,
+    comments: message.comments || [],
+    pinned: Boolean(message.pinned)
+  };
+  return await runQuery(supabase.from('messages').upsert(row));
 };
 
 // ==========================================
@@ -53,7 +78,13 @@ export const saveTodoToDb = async (todo, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('todos').delete().eq('id', todo.id));
   }
-  return await runQuery(supabase.from('todos').upsert(todo));
+  const row = {
+    id: todo.id,
+    projectId: todo.projectId,
+    categoryName: todo.categoryName || todo.title || 'General',
+    items: todo.items || []
+  };
+  return await runQuery(supabase.from('todos').upsert(row));
 };
 
 // ==========================================
@@ -68,7 +99,17 @@ export const saveChatMessageToDb = async (chatMsg, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('chatMessages').delete().eq('id', chatMsg.id));
   }
-  return await runQuery(supabase.from('chatMessages').upsert(chatMsg));
+  const row = {
+    id: chatMsg.id,
+    projectId: chatMsg.projectId,
+    channel: chatMsg.channel,
+    sender: chatMsg.sender,
+    avatar: chatMsg.avatar,
+    time: chatMsg.time,
+    text: chatMsg.text,
+    createdAt: chatMsg.createdAt || Date.now()
+  };
+  return await runQuery(supabase.from('chatMessages').upsert(row));
 };
 
 // ==========================================
@@ -83,7 +124,17 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('files').delete().eq('id', fileItem.id));
   }
-  return await runQuery(supabase.from('files').upsert(fileItem));
+  const row = {
+    id: fileItem.id,
+    projectId: fileItem.projectId,
+    name: fileItem.name,
+    size: fileItem.size,
+    type: fileItem.type,
+    uploader: fileItem.uploader,
+    date: fileItem.date,
+    url: fileItem.url
+  };
+  return await runQuery(supabase.from('files').upsert(row));
 };
 
 // ==========================================
@@ -98,7 +149,15 @@ export const saveEventToDb = async (eventItem, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('events').delete().eq('id', eventItem.id));
   }
-  return await runQuery(supabase.from('events').upsert(eventItem));
+  const row = {
+    id: eventItem.id,
+    projectId: eventItem.projectId,
+    title: eventItem.title,
+    date: eventItem.date,
+    time: eventItem.time,
+    category: eventItem.category
+  };
+  return await runQuery(supabase.from('events').upsert(row));
 };
 
 // ==========================================
@@ -113,7 +172,14 @@ export const saveCheckinToDb = async (checkinItem, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('checkins').delete().eq('id', checkinItem.id));
   }
-  return await runQuery(supabase.from('checkins').upsert(checkinItem));
+  const row = {
+    id: checkinItem.id,
+    projectId: checkinItem.projectId,
+    question: checkinItem.question,
+    frequency: checkinItem.frequency,
+    responses: checkinItem.responses || []
+  };
+  return await runQuery(supabase.from('checkins').upsert(row));
 };
 
 // ==========================================
@@ -125,5 +191,12 @@ export const fetchActivitiesFromDb = async () => {
 };
 
 export const saveActivityToDb = async (activityItem) => {
-  return await runQuery(supabase.from('activities').upsert(activityItem));
+  const row = {
+    id: activityItem.id,
+    user: activityItem.user,
+    action: activityItem.action,
+    time: activityItem.time,
+    createdAt: activityItem.createdAt || Date.now()
+  };
+  return await runQuery(supabase.from('activities').upsert(row));
 };
