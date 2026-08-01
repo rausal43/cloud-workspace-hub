@@ -5,16 +5,11 @@ import {
   ChevronDown, 
   Moon, 
   Sun, 
-  Database, 
   LogOut, 
   UserCheck, 
-  Settings, 
   Edit3, 
   Trash2, 
-  Users,
-  Shield,
-  Layers,
-  Server
+  Users
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -23,16 +18,12 @@ export default function Navbar({
   setActiveProject, 
   isDarkMode, 
   setIsDarkMode, 
-  onOpenSettings,
-  onOpenSupabaseModal,
   onNewProject,
   onEditProject,
   onDeleteProject,
   onOpenLoginModal,
   onOpenTeamModal,
-  currentUser,
-  isLiveFirebase,
-  isLiveSupabase
+  currentUser
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -83,7 +74,7 @@ export default function Navbar({
                 Google Cloud Hub
               </h1>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '-2px' }}>
-                Integrated Firebase & Drive Platform
+                Integrated Workspace & Realtime Platform
               </span>
             </div>
           </div>
@@ -233,28 +224,8 @@ export default function Navbar({
           )}
         </div>
 
-        {/* Right Actions: Database Status, Theme Toggle, Profile */}
+        {/* Right Actions: Theme Toggle & Profile */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Supabase PostgreSQL Badge Button */}
-          <button
-            onClick={onOpenSupabaseModal}
-            className="btn"
-            style={{
-              background: isLiveSupabase ? 'rgba(52, 168, 83, 0.15)' : 'rgba(26, 115, 232, 0.1)',
-              color: isLiveSupabase ? 'var(--g-green)' : 'var(--g-blue)',
-              border: `1px solid ${isLiveSupabase ? 'rgba(52,168,83,0.4)' : 'rgba(26,115,232,0.4)'}`,
-              padding: '4px 10px',
-              fontSize: '0.78rem',
-              borderRadius: '20px',
-              fontWeight: 700
-            }}
-            title="Konfigurasi Database PostgreSQL Supabase"
-          >
-            <Server size={13} />
-            <span>{isLiveSupabase ? 'SQL Live (Supabase)' : 'Connect Supabase (SQL)'}</span>
-            <Settings size={13} style={{ marginLeft: '2px', opacity: 0.7 }} />
-          </button>
-
           {/* Theme Toggle */}
           <button
             className="btn-icon"

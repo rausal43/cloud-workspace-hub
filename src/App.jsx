@@ -8,8 +8,6 @@ import ScheduleCalendar from './components/ScheduleCalendar';
 import DocsAndFiles from './components/DocsAndFiles';
 import AutomaticCheckins from './components/AutomaticCheckins';
 import GlobalDashboard from './components/GlobalDashboard';
-import FirebaseSettingsModal from './components/FirebaseSettingsModal';
-import SupabaseSettingsModal from './components/SupabaseSettingsModal';
 import LoginModal from './components/LoginModal';
 import TeamManagerModal from './components/TeamManagerModal';
 
@@ -25,7 +23,6 @@ import {
 
 import { 
   db, 
-  isLiveFirebase, 
   collection, 
   onSnapshot, 
   doc, 
@@ -34,7 +31,7 @@ import {
   deleteDoc
 } from './firebase';
 
-import { supabase, isLiveSupabase } from './supabase';
+import { supabase } from './supabase';
 
 import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
 
@@ -108,8 +105,6 @@ export default function App() {
   });
 
   // Modals state
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -131,11 +126,10 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Supabase PostgreSQL Realtime Sync Engine
+  // Supabase PostgreSQL Realtime Sync Engine (strictly configured via .env)
   useEffect(() => {
     if (!supabase) return;
 
-    // Fetch initial tables from Supabase PostgreSQL
     const fetchSupabaseTables = async () => {
       try {
         const { data: projData } = await supabase.from('projects').select('*');
@@ -160,7 +154,6 @@ export default function App() {
 
     fetchSupabaseTables();
 
-    // Subscribe to Supabase Realtime Channel
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
         fetchSupabaseTables();
@@ -471,8 +464,6 @@ export default function App() {
         setActiveProject={setActiveProject}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
-        onOpenSettings={() => setShowSettingsModal(true)}
-        onOpenSupabaseModal={() => setShowSupabaseModal(true)}
         onNewProject={() => {
           setProjName('');
           setProjDesc('');
@@ -483,8 +474,6 @@ export default function App() {
         onOpenLoginModal={() => setShowLoginModal(true)}
         onOpenTeamModal={() => setShowTeamModal(true)}
         currentUser={currentUser}
-        isLiveFirebase={isLiveFirebase}
-        isLiveSupabase={isLiveSupabase}
       />
 
       {/* Main Container */}
@@ -646,19 +635,6 @@ export default function App() {
         availableRoles={availableRoles}
         setAvailableRoles={setAvailableRoles}
         onAddActivity={handleAddActivity}
-      />
-
-      {/* Firebase Settings Modal */}
-      <FirebaseSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        isLiveFirebase={isLiveFirebase}
-      />
-
-      {/* Supabase PostgreSQL Database Settings Modal */}
-      <SupabaseSettingsModal
-        isOpen={showSupabaseModal}
-        onClose={() => setShowSupabaseModal(false)}
       />
 
       {/* New Project Modal */}
