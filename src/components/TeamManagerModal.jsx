@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle } from 'lucide-react';
+import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle, Sparkles } from 'lucide-react';
 import RoleManagerModal from './RoleManagerModal';
 
 export default function TeamManagerModal({ 
@@ -35,10 +35,14 @@ export default function TeamManagerModal({
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://project-management-388.pages.dev';
   const inviteLink = `${currentOrigin}/?invite=${encodeURIComponent(activeProject.id)}&role=${encodeURIComponent(selectedRoleName)}&email=${encodeURIComponent(inviteEmail || 'user')}`;
 
-  const handleCopyInviteLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  const handleCopyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch (err) {
+      alert("Link Undangan: " + inviteLink);
+    }
   };
 
   const handleSendGmailInvite = async (e) => {
@@ -62,33 +66,52 @@ export default function TeamManagerModal({
       onAddActivity(`Mengundang ${newMember.name} (${newMember.email}) sebagai ${selectedRoleName}`);
     }
 
-    // Prepare Email Content
+    // Call Cloudflare Pages Backend API (/api/invite)
+    try {
+      await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          projectName: activeProject.name,
+          inviteLink,
+          role: selectedRoleName
+        })
+      });
+    } catch (err) {
+      console.log("Backend invite API dispatch:", err);
+    }
+
+    // Prepare Email Content for Gmail Web Composer Fallback
     const subject = encodeURIComponent(`Undangan Akses Bergabung Proyek: ${activeProject.name}`);
     const bodyText = encodeURIComponent(
       `Halo ${newMember.name},\n\nAnda diundang untuk bergabung ke dalam proyek "${activeProject.name}" sebagai ${selectedRoleName}.\n\nKlik link di bawah ini untuk mengakses ruang kerja proyek:\n${inviteLink}\n\nSalam,\nTim ${activeProject.name}`
     );
-    
-    // Fallback Gmail Web Composer
     const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inviteEmail.trim())}&su=${subject}&body=${bodyText}`;
-    
-    // Auto Copy Invite Link to Clipboard for User Convenience
+
+    // Auto Copy Invite Link
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopiedLink(true);
     } catch (err) {}
 
-    // Open Web Composer in a new tab so user can click 'Send' directly
-    window.open(gmailWebUrl, '_blank');
+    // Open Web Composer in new tab
+    const newTab = window.open(gmailWebUrl, '_blank');
+    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+      // Browser blocked popup
+      setInviteSuccessMsg(`✓ Anggota ditambahkan! Link undangan telah disalin ke clipboard. Kirimkan link ini ke ${inviteEmail}.`);
+    } else {
+      setInviteSuccessMsg(`✓ Anggota ditambahkan! Tab Gmail telah dibuka. Klik 'Send' pada tab Gmail.`);
+    }
 
     setSendingEmail(false);
-    setInviteSuccessMsg(`✓ Anggota ditambahkan ke proyek & link undangan telah disalin! Tab Gmail composer telah dibuka.`);
     setInviteEmail('');
     setInviteName('');
     
     setTimeout(() => {
       setInviteSuccessMsg('');
       setActiveTab('list');
-    }, 3500);
+    }, 4000);
   };
 
   const handleRemoveMember = (index) => {
@@ -274,7 +297,9 @@ export default function TeamManagerModal({
             <div style={{ background: 'var(--g-blue-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '14px', fontSize: '0.8rem', color: 'var(--g-blue)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
               <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>
-                <strong>Cara Pengiriman Undangan:</strong> Klik tombol di bawah akan membuka tab draf Gmail berisi link akses proyek. Anda juga bisa menyalin link undangan fisik secara manual untuk dikirim via WA/Chat.
+                <strong>Dua Cara Mengirimkan Undangan:</strong>
+                <br />1. Klik <strong>"Salin Link"</strong> dan kirimkan link tersebut via Chat/WA/Email ke rekan Anda.
+                <br />2. Klik tombol biru di bawah untuk membuka tab draf Gmail.
               </div>
             </div>
 
@@ -358,7 +383,7 @@ export default function TeamManagerModal({
                 Kembali ke Daftar Tim
               </button>
               <button type="submit" className="btn btn-primary" disabled={sendingEmail}>
-                <Send size={16} /> {sendingEmail ? 'Memproses...' : 'Buka Gmail & Kirim Undangan'}
+                <Send size={16} /> {sendingEmail ? 'Memproses...' : 'Kirim Undangan Gmail'}
               </button>
             </div>
           </form>
