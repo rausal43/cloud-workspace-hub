@@ -48,13 +48,13 @@ export function useWorkspaceData(currentUser) {
     return saved ? JSON.parse(saved) : INITIAL_CHECKINS;
   });
 
-  // 1. Fetch & Realtime Sync from Supabase PostgreSQL
+  // 1. Fetch & Realtime Sync from Supabase PostgreSQL (safely checking array length to prevent wiping local storage)
   useEffect(() => {
     if (!supabase) return;
 
     const fetchAllData = async () => {
       const projData = await dbService.fetchProjectsFromDb();
-      if (projData && projData.length > 0) {
+      if (projData && Array.isArray(projData) && projData.length > 0) {
         setProjects(projData);
         localStorage.setItem('hub_projects', JSON.stringify(projData));
         setActiveProject(prev => {
@@ -64,25 +64,46 @@ export function useWorkspaceData(currentUser) {
       }
 
       const msgData = await dbService.fetchMessagesFromDb();
-      if (msgData) { setMessages(msgData); localStorage.setItem('hub_messages', JSON.stringify(msgData)); }
+      if (msgData && Array.isArray(msgData) && msgData.length > 0) { 
+        setMessages(msgData); 
+        localStorage.setItem('hub_messages', JSON.stringify(msgData)); 
+      }
 
       const todoData = await dbService.fetchTodosFromDb();
-      if (todoData) { setTodos(todoData); localStorage.setItem('hub_todos', JSON.stringify(todoData)); }
+      if (todoData && Array.isArray(todoData) && todoData.length > 0) { 
+        setTodos(todoData); 
+        localStorage.setItem('hub_todos', JSON.stringify(todoData)); 
+      }
 
       const chatData = await dbService.fetchChatMessagesFromDb();
-      if (chatData) { setChatMessages(chatData); localStorage.setItem('hub_chat', JSON.stringify(chatData)); }
+      if (chatData && Array.isArray(chatData) && chatData.length > 0) { 
+        setChatMessages(chatData); 
+        localStorage.setItem('hub_chat', JSON.stringify(chatData)); 
+      }
 
       const fileData = await dbService.fetchFilesFromDb();
-      if (fileData) { setFiles(fileData); localStorage.setItem('hub_files', JSON.stringify(fileData)); }
+      if (fileData && Array.isArray(fileData) && fileData.length > 0) { 
+        setFiles(fileData); 
+        localStorage.setItem('hub_files', JSON.stringify(fileData)); 
+      }
 
       const eventData = await dbService.fetchEventsFromDb();
-      if (eventData) { setEvents(eventData); localStorage.setItem('hub_events', JSON.stringify(eventData)); }
+      if (eventData && Array.isArray(eventData) && eventData.length > 0) { 
+        setEvents(eventData); 
+        localStorage.setItem('hub_events', JSON.stringify(eventData)); 
+      }
 
       const checkinData = await dbService.fetchCheckinsFromDb();
-      if (checkinData) { setCheckins(checkinData); localStorage.setItem('hub_checkins', JSON.stringify(checkinData)); }
+      if (checkinData && Array.isArray(checkinData) && checkinData.length > 0) { 
+        setCheckins(checkinData); 
+        localStorage.setItem('hub_checkins', JSON.stringify(checkinData)); 
+      }
 
       const actData = await dbService.fetchActivitiesFromDb();
-      if (actData) { setActivities(actData); localStorage.setItem('hub_activities', JSON.stringify(actData)); }
+      if (actData && Array.isArray(actData) && actData.length > 0) { 
+        setActivities(actData); 
+        localStorage.setItem('hub_activities', JSON.stringify(actData)); 
+      }
     };
 
     fetchAllData();
@@ -138,7 +159,7 @@ export function useWorkspaceData(currentUser) {
     } catch (e) {}
   };
 
-  // Helper Mutation Wrappers
+  // Helper Mutation Wrappers (Atomic Local & Supabase Sync)
   const handleAddActivity = async (actionText) => {
     const newAct = {
       id: `act-${Date.now()}`,
