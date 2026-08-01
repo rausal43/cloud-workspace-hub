@@ -50,6 +50,38 @@ export default function App() {
     broadcastSync
   } = useWorkspaceData(currentUser);
 
+  // Unread Notification Tracker
+  const [lastVisitedTabs, setLastVisitedTabs] = useState(() => {
+    const saved = localStorage.getItem('hub_lastVisitedTabs');
+    return saved ? JSON.parse(saved) : { overview: Date.now() };
+  });
+
+  const handleSelectTab = (tabId) => {
+    setActiveTab(tabId);
+    const updated = { ...lastVisitedTabs, [tabId]: Date.now() };
+    setLastVisitedTabs(updated);
+    localStorage.setItem('hub_lastVisitedTabs', JSON.stringify(updated));
+  };
+
+  const getUnreadCount = (tabId, items = []) => {
+    const lastTime = lastVisitedTabs[tabId] || 0;
+    if (!lastTime) return 0;
+    const projItems = items.filter(i => !i.projectId || i.projectId === activeProject?.id);
+    return projItems.filter(i => {
+      const itemTime = i.createdAt || (i.id ? parseInt(i.id.split('-')[1]) || 0 : 0);
+      return itemTime > lastTime;
+    }).length;
+  };
+
+  const unreadCounts = {
+    messages: getUnreadCount('messages', messages),
+    todos: getUnreadCount('todos', todos),
+    chat: getUnreadCount('chat', chatMessages),
+    schedule: getUnreadCount('schedule', events),
+    files: getUnreadCount('files', files),
+    standups: getUnreadCount('standups', checkins)
+  };
+
   // Available Roles & Modals state
   const [availableRoles, setAvailableRoles] = useState(INITIAL_ROLES);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -205,7 +237,7 @@ export default function App() {
       />
 
       <main style={{ flex: 1, maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '0 24px' }}>
-        <NavigationSubTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+        <NavigationSubTabs activeTab={activeTab} setActiveTab={handleSelectTab} unreadCounts={unreadCounts} />
 
         {activeTab === 'global' && (
           <GlobalDashboard
