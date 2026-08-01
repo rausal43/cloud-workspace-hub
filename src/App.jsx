@@ -22,7 +22,19 @@ import {
   INITIAL_CHECKINS
 } from './data/mockData';
 
-import { isLiveFirebase } from './firebase';
+import { 
+  db, 
+  isLiveFirebase, 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  addDoc, 
+  query, 
+  orderBy 
+} from './firebase';
+
 import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
 
 const INITIAL_ROLES = [
@@ -36,7 +48,7 @@ const INITIAL_ROLES = [
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Load Projects from LocalStorage if available
+  // Load Projects from LocalStorage / Firestore
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('hub_projects');
     return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
@@ -60,7 +72,6 @@ export default function App() {
     if (savedUser) {
       try { return JSON.parse(savedUser); } catch (e) {}
     }
-    // Default to NULL (Logged Out) so user logs in as their real account!
     return null;
   });
 
@@ -109,7 +120,69 @@ export default function App() {
   const [projCat, setProjCat] = useState('Productivity');
   const [projColor, setProjColor] = useState('#1a73e8');
 
-  // Persist Current User in LocalStorage
+  // =========================================================
+  // ⚡ FIRESTORE REALTIME SYNC LISTENERS (`onSnapshot`)
+  // =========================================================
+  useEffect(() => {
+    if (!isLiveFirebase || !db) return;
+
+    // 1. Projects Realtime Listener
+    const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setProjects(cloudProj);
+        // Sync active project if needed
+        setActiveProject(prev => {
+          if (!prev) return cloudProj[0];
+          const updated = cloudProj.find(p => p.id === prev.id);
+          return updated || cloudProj[0];
+        });
+      }
+    });
+
+    // 2. Activities Realtime Listener
+    const unsubActivities = onSnapshot(collection(db, 'activities'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudAct = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        cloudAct.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        setActivities(cloudAct);
+      }
+    });
+
+    // 3. Todos Realtime Listener
+    const unsubTodos = onSnapshot(collection(db, 'todos'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudTodos = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setTodos(cloudTodos);
+      }
+    });
+
+    // 4. Messages Realtime Listener
+    const unsubMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudMsg = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setMessages(cloudMsg);
+      }
+    });
+
+    // 5. Events Realtime Listener
+    const unsubEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudEvents = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setEvents(cloudEvents);
+      }
+    });
+
+    return () => {
+      unsubProjects();
+      unsubActivities();
+      unsubTodos();
+      unsubMessages();
+      unsubEvents();
+    };
+  }, [isLiveFirebase]);
+
+  // Persist LocalStorage Backup
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
@@ -118,25 +191,32 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Persist Projects in LocalStorage
   useEffect(() => {
     localStorage.setItem('hub_projects', JSON.stringify(projects));
   }, [projects]);
 
-  // Persist Activities in LocalStorage
   useEffect(() => {
     localStorage.setItem('hub_activities', JSON.stringify(activities));
   }, [activities]);
 
-  // Helper to add real activity log
-  const handleAddActivity = (actionText) => {
+  // Helper to add real activity log and write to Cloud Firestore
+  const handleAddActivity = async (actionText) => {
     const newAct = {
       id: `act-${Date.now()}`,
       user: currentUser ? currentUser.name : 'Pengguna',
       action: actionText,
-      time: 'Baru saja'
+      time: 'Baru saja',
+      createdAt: Date.now()
     };
     setActivities(prev => [newAct, ...prev]);
+
+    if (isLiveFirebase && db) {
+      try {
+        await setDoc(doc(db, 'activities', newAct.id), newAct);
+      } catch (err) {
+        console.warn("Firestore activity sync error:", err);
+      }
+    }
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -171,7 +251,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const handleCreateProject = (e) => {
+  const handleCreateProject = async (e) => {
     e.preventDefault();
     if (!projName.trim()) return;
 
@@ -192,6 +272,15 @@ export default function App() {
     setProjName('');
     setProjDesc('');
     setShowNewProjectModal(false);
+
+    if (isLiveFirebase && db) {
+      try {
+        await setDoc(doc(db, 'projects', newProject.id), newProject);
+      } catch (err) {
+        console.warn("Firestore project write error:", err);
+      }
+    }
+
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -204,40 +293,40 @@ export default function App() {
     setShowEditProjectModal(true);
   };
 
-  const handleSaveEditProject = (e) => {
+  const handleSaveEditProject = async (e) => {
     e.preventDefault();
     if (!projName.trim() || !activeProject) return;
 
-    const updatedProjects = projects.map(p => {
-      if (p.id === activeProject.id) {
-        return {
-          ...p,
-          name: projName,
-          description: projDesc,
-          category: projCat,
-          color: projColor,
-          updatedAt: 'Baru saja diperbarui'
-        };
-      }
-      return p;
-    });
-
-    setProjects(updatedProjects);
-    setActiveProject({
+    const updatedData = {
       ...activeProject,
       name: projName,
       description: projDesc,
       category: projCat,
       color: projColor,
       updatedAt: 'Baru saja diperbarui'
-    });
+    };
+
+    const updatedProjects = projects.map(p => p.id === activeProject.id ? updatedData : p);
+
+    setProjects(updatedProjects);
+    setActiveProject(updatedData);
     setShowEditProjectModal(false);
+
+    if (isLiveFirebase && db) {
+      try {
+        await setDoc(doc(db, 'projects', activeProject.id), updatedData);
+      } catch (err) {
+        console.warn("Firestore project update error:", err);
+      }
+    }
+
     handleAddActivity(`memperbarui informasi proyek`);
   };
 
-  const handleDeleteProject = () => {
+  const handleDeleteProject = async () => {
     if (!activeProject) return;
-    const remaining = projects.filter(p => p.id !== activeProject.id);
+    const deletedId = activeProject.id;
+    const remaining = projects.filter(p => p.id !== deletedId);
     setProjects(remaining);
     if (remaining.length > 0) {
       setActiveProject(remaining[0]);
@@ -245,13 +334,31 @@ export default function App() {
       setActiveProject(null);
     }
     setShowDeleteConfirmModal(false);
+
+    if (isLiveFirebase && db) {
+      try {
+        await deleteDoc(doc(db, 'projects', deletedId));
+      } catch (err) {
+        console.warn("Firestore project delete error:", err);
+      }
+    }
   };
 
-  const handleUpdateProjectMembers = (newMembers) => {
+  const handleUpdateProjectMembers = async (newMembers) => {
     if (!activeProject) return;
-    const updated = projects.map(p => p.id === activeProject.id ? { ...p, members: newMembers } : p);
-    setProjects(updated);
-    setActiveProject({ ...activeProject, members: newMembers });
+    const updatedProj = { ...activeProject, members: newMembers };
+    const updatedProjects = projects.map(p => p.id === activeProject.id ? updatedProj : p);
+    
+    setProjects(updatedProjects);
+    setActiveProject(updatedProj);
+
+    if (isLiveFirebase && db) {
+      try {
+        await setDoc(doc(db, 'projects', activeProject.id), updatedProj);
+      } catch (err) {
+        console.warn("Firestore member update error:", err);
+      }
+    }
   };
 
   const handleSelectProjectFromGlobal = (projId) => {

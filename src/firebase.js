@@ -1,6 +1,17 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  collection, 
+  query, 
+  orderBy 
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Default Firebase credentials placeholder
@@ -32,4 +43,21 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   console.log("⚡ Running in Google Firebase Demo/Mock Mode. You can add your API keys anytime in Settings.");
 }
 
-export { app, auth, db, storage, googleProvider, isLiveFirebase, firebaseConfig };
+export { 
+  app, 
+  auth, 
+  db, 
+  storage, 
+  googleProvider, 
+  isLiveFirebase, 
+  firebaseConfig,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  collection,
+  query,
+  orderBy
+};
