@@ -238,7 +238,7 @@ export default function App() {
                 />
               )}
               {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-              {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+              {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} projects={projects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
               {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} currentUser={currentUser} />}
               {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
               {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}

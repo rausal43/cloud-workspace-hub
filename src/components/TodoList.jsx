@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 import TodoListKanban from './TodoListKanban';
 import { AddTaskModal, EditTaskModal, AddCategoryModal } from './TodoListModals';
 
-export default function TodoList({ todos, setTodos, activeProject, currentUser, notify }) {
+export default function TodoList({ todos, setTodos, activeProject, projects = [], currentUser, notify }) {
   const [viewMode, setViewMode] = useState('list');
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -20,6 +20,12 @@ export default function TodoList({ todos, setTodos, activeProject, currentUser, 
   const isMatchProject = (projId) => {
     if (!projId || !activeProject) return true;
     if (projId === activeProject.id) return true;
+    if (activeProject.name && Array.isArray(projects)) {
+      const targetProj = projects.find(p => p.id === projId);
+      if (targetProj && targetProj.name && targetProj.name.toLowerCase() === activeProject.name.toLowerCase()) {
+        return true;
+      }
+    }
     return false;
   };
 
