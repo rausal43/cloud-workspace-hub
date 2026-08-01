@@ -43,9 +43,6 @@ const INITIAL_ROLES = [
   { id: 'role-viewer', name: 'Viewer', level: 'Read-Only', canEdit: false, canDelete: false, canInvite: false, canManageProject: false, color: '#80868b' }
 ];
 
-// Shared Public Cloud Realtime Endpoint for instant multi-device sync
-const CLOUD_SYNC_URL = 'https://cloud-workspace-hub-default-rtdb.firebaseio.com/workspace.json';
-
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -130,8 +127,33 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Push full application state to Global Cloud Store
-  const pushToCloud = async (overrideState = {}) => {
+  // BroadcastChannel for instant same-browser cross-tab sync
+  useEffect(() => {
+    let bc;
+    try {
+      bc = new BroadcastChannel('gcloud_hub_sync');
+      bc.onmessage = (event) => {
+        if (event.data) {
+          const { type, payload } = event.data;
+          if (type === 'SYNC_ALL' && payload) {
+            if (payload.projects) setProjects(payload.projects);
+            if (payload.messages) setMessages(payload.messages);
+            if (payload.todos) setTodos(payload.todos);
+            if (payload.chatMessages) setChatMessages(payload.chatMessages);
+            if (payload.events) setEvents(payload.events);
+            if (payload.files) setFiles(payload.files);
+            if (payload.checkins) setCheckins(payload.checkins);
+            if (payload.activities) setActivities(payload.activities);
+          }
+        }
+      };
+    } catch (e) {}
+    return () => {
+      if (bc) bc.close();
+    };
+  }, []);
+
+  const broadcastSync = (overrideState = {}) => {
     const payload = {
       projects: overrideState.projects || projects,
       messages: overrideState.messages || messages,
@@ -140,16 +162,12 @@ export default function App() {
       files: overrideState.files || files,
       events: overrideState.events || events,
       checkins: overrideState.checkins || checkins,
-      activities: overrideState.activities || activities,
-      updatedAt: Date.now()
+      activities: overrideState.activities || activities
     };
-
     try {
-      await fetch(CLOUD_SYNC_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const bc = new BroadcastChannel('gcloud_hub_sync');
+      bc.postMessage({ type: 'SYNC_ALL', payload });
+      bc.close();
     } catch (e) {}
 
     if (db) {
@@ -158,61 +176,6 @@ export default function App() {
       } catch (e) {}
     }
   };
-
-  // Pull live data from Global Cloud Store across all devices worldwide
-  useEffect(() => {
-    const pullFromCloud = async () => {
-      try {
-        const res = await fetch(CLOUD_SYNC_URL);
-        if (res.ok) {
-          const data = await res.json();
-          if (data) {
-            if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
-              setProjects(data.projects);
-              localStorage.setItem('hub_projects', JSON.stringify(data.projects));
-              setActiveProject(prev => {
-                if (!prev) return data.projects[0];
-                const found = data.projects.find(p => p.id === prev.id);
-                return found || data.projects[0];
-              });
-            }
-            if (data.messages && Array.isArray(data.messages)) {
-              setMessages(data.messages);
-              localStorage.setItem('hub_messages', JSON.stringify(data.messages));
-            }
-            if (data.todos && Array.isArray(data.todos)) {
-              setTodos(data.todos);
-              localStorage.setItem('hub_todos', JSON.stringify(data.todos));
-            }
-            if (data.chatMessages && Array.isArray(data.chatMessages)) {
-              setChatMessages(data.chatMessages);
-              localStorage.setItem('hub_chat', JSON.stringify(data.chatMessages));
-            }
-            if (data.files && Array.isArray(data.files)) {
-              setFiles(data.files);
-              localStorage.setItem('hub_files', JSON.stringify(data.files));
-            }
-            if (data.events && Array.isArray(data.events)) {
-              setEvents(data.events);
-              localStorage.setItem('hub_events', JSON.stringify(data.events));
-            }
-            if (data.checkins && Array.isArray(data.checkins)) {
-              setCheckins(data.checkins);
-              localStorage.setItem('hub_checkins', JSON.stringify(data.checkins));
-            }
-            if (data.activities && Array.isArray(data.activities)) {
-              setActivities(data.activities);
-              localStorage.setItem('hub_activities', JSON.stringify(data.activities));
-            }
-          }
-        }
-      } catch (e) {}
-    };
-
-    pullFromCloud();
-    const interval = setInterval(pullFromCloud, 3000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Firestore Realtime Listener fallback if db is connected
   useEffect(() => {
@@ -258,44 +221,44 @@ export default function App() {
     const updatedActs = [newAct, ...activities];
     setActivities(updatedActs);
     localStorage.setItem('hub_activities', JSON.stringify(updatedActs));
-    pushToCloud({ activities: updatedActs });
+    broadcastSync({ activities: updatedActs });
   };
 
-  // State sync wrapper functions for child modules (Instant local + cloud sync)
+  // State sync wrapper functions for child modules (Instant local + broadcast sync)
   const handleUpdateMessages = async (newMessagesList) => {
     setMessages(newMessagesList);
     localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
-    pushToCloud({ messages: newMessagesList });
+    broadcastSync({ messages: newMessagesList });
   };
 
   const handleUpdateTodos = async (newTodosList) => {
     setTodos(newTodosList);
     localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
-    pushToCloud({ todos: newTodosList });
+    broadcastSync({ todos: newTodosList });
   };
 
   const handleUpdateChatMessages = async (newChatList) => {
     setChatMessages(newChatList);
     localStorage.setItem('hub_chat', JSON.stringify(newChatList));
-    pushToCloud({ chatMessages: newChatList });
+    broadcastSync({ chatMessages: newChatList });
   };
 
   const handleUpdateEvents = async (newEventsList) => {
     setEvents(newEventsList);
     localStorage.setItem('hub_events', JSON.stringify(newEventsList));
-    pushToCloud({ events: newEventsList });
+    broadcastSync({ events: newEventsList });
   };
 
   const handleUpdateFiles = async (newFilesList) => {
     setFiles(newFilesList);
     localStorage.setItem('hub_files', JSON.stringify(newFilesList));
-    pushToCloud({ files: newFilesList });
+    broadcastSync({ files: newFilesList });
   };
 
   const handleUpdateCheckins = async (newCheckinsList) => {
     setCheckins(newCheckinsList);
     localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
-    pushToCloud({ checkins: newCheckinsList });
+    broadcastSync({ checkins: newCheckinsList });
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -342,7 +305,7 @@ export default function App() {
         const updatedProjects = projects.map(p => p.id === finalProj.id ? finalProj : p);
         setProjects(updatedProjects);
         setActiveProject(finalProj);
-        pushToCloud({ projects: updatedProjects });
+        broadcastSync({ projects: updatedProjects });
       }
     }
   }, [isDarkMode, currentUser]);
@@ -377,7 +340,7 @@ export default function App() {
     setProjDesc('');
     setShowNewProjectModal(false);
 
-    pushToCloud({ projects: updatedProjects });
+    broadcastSync({ projects: updatedProjects });
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -409,7 +372,7 @@ export default function App() {
     setActiveProject(updatedData);
     setShowEditProjectModal(false);
 
-    pushToCloud({ projects: updatedProjects });
+    broadcastSync({ projects: updatedProjects });
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
@@ -425,7 +388,7 @@ export default function App() {
     }
     setShowDeleteConfirmModal(false);
 
-    pushToCloud({ projects: remaining });
+    broadcastSync({ projects: remaining });
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
@@ -436,7 +399,7 @@ export default function App() {
     setProjects(updatedProjects);
     setActiveProject(updatedProj);
 
-    pushToCloud({ projects: updatedProjects });
+    broadcastSync({ projects: updatedProjects });
   };
 
   const handleSelectProjectFromGlobal = (projId) => {
