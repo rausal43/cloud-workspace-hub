@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Calendar as CalendarIcon, Plus, Clock, MapPin, CheckCircle, Edit3, Trash2, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function ScheduleCalendar({ events, setEvents, activeProject, notify }) {
+export default function ScheduleCalendar({ events, setEvents, activeProject, currentUser, notify }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -27,6 +27,7 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
   const toggleEventCompleted = (evtId, e) => {
     if (e) e.stopPropagation();
 
+    let targetUpdated = null;
     const updated = events.map(evt => {
       if (evt.id === evtId) {
         const nextState = !evt.completed;
@@ -38,12 +39,13 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
         } else {
           notify?.(`Status acara "${evt.title}" diperbarui`, 'info');
         }
-        return { ...evt, completed: nextState };
+        targetUpdated = { ...evt, completed: nextState };
+        return targetUpdated;
       }
       return evt;
     });
 
-    setEvents(updated);
+    setEvents(updated, targetUpdated, false);
   };
 
   const handleAddEvent = (e) => {
@@ -62,7 +64,8 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
       completed: false
     };
 
-    setEvents([...events, newEvent]);
+    const updated = [...events, newEvent];
+    setEvents(updated, newEvent, false);
     setTitle('');
     setDate('');
     setColor('#1a73e8');
@@ -84,9 +87,10 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
     e.preventDefault();
     if (!title.trim() || !date || !editingEvent) return;
 
-    setEvents(events.map(evt => {
+    let targetUpdated = null;
+    const updated = events.map(evt => {
       if (evt.id === editingEvent.id) {
-        return {
+        targetUpdated = {
           ...evt,
           title,
           date,
@@ -95,10 +99,12 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
           color,
           syncGoogleCalendar
         };
+        return targetUpdated;
       }
       return evt;
-    }));
+    });
 
+    setEvents(updated, targetUpdated, false);
     setEditingEvent(null);
     setTitle('');
     setDate('');
@@ -106,7 +112,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, not
   };
 
   const handleDeleteEvent = (evtId) => {
-    setEvents(events.filter(e => e.id !== evtId));
+    const deletedItem = events.find(e => e.id === evtId) || { id: evtId };
+    const remaining = events.filter(e => e.id !== evtId);
+    setEvents(remaining, deletedItem, true);
     notify?.('Acara berhasil dihapus dari kalender', 'delete');
   };
 

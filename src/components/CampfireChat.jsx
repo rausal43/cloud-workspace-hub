@@ -8,7 +8,7 @@ const INITIAL_CHANNELS = [
   { id: 'design', name: 'design-system', desc: 'Wireframe, UI/UX & Feedback visual' }
 ];
 
-export default function CampfireChat({ chatMessages, setChatMessages, activeProject, notify }) {
+export default function CampfireChat({ chatMessages, setChatMessages, activeProject, currentUser, notify }) {
   const [channels, setChannels] = useLocalStorageState('gcloud_chat_channels', INITIAL_CHANNELS);
   const [activeChannel, setActiveChannel] = useState('general');
   const [textInput, setTextInput] = useState('');
@@ -24,6 +24,9 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  const senderName = currentUser ? currentUser.name : 'Rausal Bahtiar';
+  const senderAvatar = currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!textInput.trim()) return;
@@ -31,13 +34,16 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     const newMsg = {
       id: `chat-${Date.now()}`,
       projectId: activeProject.id,
-      sender: 'Budi Santoso',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      channel: activeChannel,
+      sender: senderName,
+      avatar: senderAvatar,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      text: textInput
+      text: textInput,
+      createdAt: Date.now()
     };
 
-    setChatMessages([...chatMessages, newMsg]);
+    const updated = [...chatMessages, newMsg];
+    setChatMessages(updated, newMsg);
     setTextInput('');
     notify?.('Pesan terkirim ke obrolan', 'info');
   };

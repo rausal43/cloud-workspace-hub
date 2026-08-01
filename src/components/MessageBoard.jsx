@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, Pin, Plus, Search, MessageCircle, User, Calendar, Tag, Edit3, Trash2, Settings, Check } from 'lucide-react';
 import { useLocalStorageState } from '../hooks/useLocalStorage';
 
-export default function MessageBoard({ messages, setMessages, activeProject, notify }) {
+export default function MessageBoard({ messages, setMessages, activeProject, currentUser, notify }) {
   const [categories, setCategories] = useLocalStorageState('gcloud_message_categories', ['Pengumuman', 'Desain', 'Teknis', 'Pitch']);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +33,9 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
     return matchesCat && matchesSearch;
   });
 
+  const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
+  const authorAvatar = currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+
   const handleCreatePost = (e) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
@@ -41,8 +44,8 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
       id: `msg-${Date.now()}`,
       projectId: activeProject.id,
       title,
-      author: 'Budi Santoso',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      author: authorName,
+      authorAvatar: authorAvatar,
       category: category || categories[0] || 'Pengumuman',
       date: 'Baru saja',
       content,
@@ -51,7 +54,8 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
       pinned: false
     };
 
-    setMessages([newMsg, ...messages]);
+    const updated = [newMsg, ...messages];
+    setMessages(updated, newMsg, false);
     setTitle('');
     setContent('');
     setShowCreateModal(false);
@@ -70,26 +74,25 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
     e.preventDefault();
     if (!title.trim() || !content.trim() || !editingMessage) return;
 
-    setMessages(messages.map(m => {
+    let targetUpdated = null;
+    const updated = messages.map(m => {
       if (m.id === editingMessage.id) {
-        return {
+        targetUpdated = {
           ...m,
           title,
           category,
           content,
           date: 'Diperbarui baru saja'
         };
+        return targetUpdated;
       }
       return m;
-    }));
+    });
+
+    setMessages(updated, targetUpdated, false);
 
     if (activeMessageDetail && activeMessageDetail.id === editingMessage.id) {
-      setActiveMessageDetail({
-        ...activeMessageDetail,
-        title,
-        category,
-        content
-      });
+      setActiveMessageDetail(targetUpdated);
     }
 
     setEditingMessage(null);
@@ -100,7 +103,9 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
 
   const handleDeletePost = (msgId, e) => {
     if (e) e.stopPropagation();
-    setMessages(messages.filter(m => m.id !== msgId));
+    const deletedItem = messages.find(m => m.id === msgId) || { id: msgId };
+    const remaining = messages.filter(m => m.id !== msgId);
+    setMessages(remaining, deletedItem, true);
     if (activeMessageDetail && activeMessageDetail.id === msgId) {
       setActiveMessageDetail(null);
     }
@@ -125,7 +130,8 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
     setCategories(updated);
 
     // Update messages under old category
-    setMessages(messages.map(m => m.category === oldCat ? { ...m, category: editCatNameText.trim() } : m));
+    const updatedMsgs = messages.map(m => m.category === oldCat ? { ...m, category: editCatNameText.trim() } : m);
+    setMessages(updatedMsgs);
     if (selectedCategory === oldCat) setSelectedCategory(editCatNameText.trim());
 
     setEditingCatIndex(null);
@@ -142,60 +148,68 @@ export default function MessageBoard({ messages, setMessages, activeProject, not
     if (!commentText.trim()) return;
     const newComment = {
       id: `c-${Date.now()}`,
-      author: 'Budi Santoso',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      author: authorName,
+      avatar: authorAvatar,
       time: 'Baru saja',
       text: commentText
     };
 
-    setMessages(messages.map(m => {
+    let targetUpdated = null;
+    const updated = messages.map(m => {
       if (m.id === msgId) {
         const comments = m.comments || [];
-        return {
+        targetUpdated = {
           ...m,
-          commentsCount: m.commentsCount + 1,
+          commentsCount: (m.commentsCount || 0) + 1,
           comments: [...comments, newComment]
         };
+        return targetUpdated;
       }
       return m;
-    }));
+    });
+
+    setMessages(updated, targetUpdated, false);
 
     if (activeMessageDetail && activeMessageDetail.id === msgId) {
-      setActiveMessageDetail({
-        ...activeMessageDetail,
-        commentsCount: activeMessageDetail.commentsCount + 1,
-        comments: [...(activeMessageDetail.comments || []), newComment]
-      });
+      setActiveMessageDetail(targetUpdated);
     }
 
     setCommentText('');
   };
 
   const handleDeleteComment = (msgId, commentId) => {
-    setMessages(messages.map(m => {
+    let targetUpdated = null;
+    const updated = messages.map(m => {
       if (m.id === msgId) {
         const updatedComments = (m.comments || []).filter(c => c.id !== commentId);
-        return {
+        targetUpdated = {
           ...m,
-          commentsCount: Math.max(0, m.commentsCount - 1),
+          commentsCount: Math.max(0, (m.commentsCount || 1) - 1),
           comments: updatedComments
         };
+        return targetUpdated;
       }
       return m;
-    }));
+    });
+
+    setMessages(updated, targetUpdated, false);
 
     if (activeMessageDetail && activeMessageDetail.id === msgId) {
-      setActiveMessageDetail({
-        ...activeMessageDetail,
-        commentsCount: Math.max(0, activeMessageDetail.commentsCount - 1),
-        comments: (activeMessageDetail.comments || []).filter(c => c.id !== commentId)
-      });
+      setActiveMessageDetail(targetUpdated);
     }
   };
 
   const togglePin = (msgId, e) => {
     if (e) e.stopPropagation();
-    setMessages(messages.map(m => m.id === msgId ? { ...m, pinned: !m.pinned } : m));
+    let targetUpdated = null;
+    const updated = messages.map(m => {
+      if (m.id === msgId) {
+        targetUpdated = { ...m, pinned: !m.pinned };
+        return targetUpdated;
+      }
+      return m;
+    });
+    setMessages(updated, targetUpdated, false);
   };
 
   return (

@@ -29,10 +29,7 @@ import {
   onSnapshot, 
   doc, 
   setDoc, 
-  deleteDoc, 
-  addDoc, 
-  query, 
-  orderBy 
+  deleteDoc
 } from './firebase';
 
 import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
@@ -48,7 +45,7 @@ const INITIAL_ROLES = [
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Load Projects from LocalStorage / Firestore
+  // Projects State
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('hub_projects');
     return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
@@ -75,7 +72,7 @@ export default function App() {
     return null;
   });
 
-  // Module States
+  // Module States (Persisted in LocalStorage + Firestore Sync)
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('hub_messages');
     return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
@@ -124,14 +121,14 @@ export default function App() {
   // ⚡ FIRESTORE REALTIME SYNC LISTENERS (`onSnapshot`)
   // =========================================================
   useEffect(() => {
-    if (!isLiveFirebase || !db) return;
+    if (!db) return;
 
     // 1. Projects Realtime Listener
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setProjects(cloudProj);
-        // Sync active project if needed
+        localStorage.setItem('hub_projects', JSON.stringify(cloudProj));
         setActiveProject(prev => {
           if (!prev) return cloudProj[0];
           const updated = cloudProj.find(p => p.id === prev.id);
@@ -146,6 +143,7 @@ export default function App() {
         const cloudAct = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         cloudAct.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setActivities(cloudAct);
+        localStorage.setItem('hub_activities', JSON.stringify(cloudAct));
       }
     });
 
@@ -154,6 +152,7 @@ export default function App() {
       if (!snapshot.empty) {
         const cloudTodos = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setTodos(cloudTodos);
+        localStorage.setItem('hub_todos', JSON.stringify(cloudTodos));
       }
     });
 
@@ -162,14 +161,44 @@ export default function App() {
       if (!snapshot.empty) {
         const cloudMsg = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setMessages(cloudMsg);
+        localStorage.setItem('hub_messages', JSON.stringify(cloudMsg));
       }
     });
 
-    // 5. Events Realtime Listener
+    // 5. Chat Messages Realtime Listener
+    const unsubChat = onSnapshot(collection(db, 'chatMessages'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudChat = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        cloudChat.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        setChatMessages(cloudChat);
+        localStorage.setItem('hub_chat', JSON.stringify(cloudChat));
+      }
+    });
+
+    // 6. Events Realtime Listener
     const unsubEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
       if (!snapshot.empty) {
         const cloudEvents = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
         setEvents(cloudEvents);
+        localStorage.setItem('hub_events', JSON.stringify(cloudEvents));
+      }
+    });
+
+    // 7. Files Realtime Listener
+    const unsubFiles = onSnapshot(collection(db, 'files'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudFiles = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setFiles(cloudFiles);
+        localStorage.setItem('hub_files', JSON.stringify(cloudFiles));
+      }
+    });
+
+    // 8. Checkins Realtime Listener
+    const unsubCheckins = onSnapshot(collection(db, 'checkins'), (snapshot) => {
+      if (!snapshot.empty) {
+        const cloudCheck = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+        setCheckins(cloudCheck);
+        localStorage.setItem('hub_checkins', JSON.stringify(cloudCheck));
       }
     });
 
@@ -178,11 +207,14 @@ export default function App() {
       unsubActivities();
       unsubTodos();
       unsubMessages();
+      unsubChat();
       unsubEvents();
+      unsubFiles();
+      unsubCheckins();
     };
-  }, [isLiveFirebase]);
+  }, []);
 
-  // Persist LocalStorage Backup
+  // Persist LocalStorage Backups
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
@@ -191,13 +223,14 @@ export default function App() {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    localStorage.setItem('hub_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem('hub_activities', JSON.stringify(activities));
-  }, [activities]);
+  useEffect(() => { localStorage.setItem('hub_projects', JSON.stringify(projects)); }, [projects]);
+  useEffect(() => { localStorage.setItem('hub_messages', JSON.stringify(messages)); }, [messages]);
+  useEffect(() => { localStorage.setItem('hub_todos', JSON.stringify(todos)); }, [todos]);
+  useEffect(() => { localStorage.setItem('hub_chat', JSON.stringify(chatMessages)); }, [chatMessages]);
+  useEffect(() => { localStorage.setItem('hub_events', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('hub_files', JSON.stringify(files)); }, [files]);
+  useEffect(() => { localStorage.setItem('hub_checkins', JSON.stringify(checkins)); }, [checkins]);
+  useEffect(() => { localStorage.setItem('hub_activities', JSON.stringify(activities)); }, [activities]);
 
   // Helper to add real activity log and write to Cloud Firestore
   const handleAddActivity = async (actionText) => {
@@ -210,12 +243,91 @@ export default function App() {
     };
     setActivities(prev => [newAct, ...prev]);
 
-    if (isLiveFirebase && db) {
+    if (db) {
       try {
         await setDoc(doc(db, 'activities', newAct.id), newAct);
-      } catch (err) {
-        console.warn("Firestore activity sync error:", err);
-      }
+      } catch (err) {}
+    }
+  };
+
+  // State sync wrapper functions for child modules to write to Firestore
+  const handleUpdateMessages = async (newMessagesList, updatedItem = null, isDelete = false) => {
+    setMessages(newMessagesList);
+    localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
+    if (db && updatedItem) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, 'messages', updatedItem.id));
+        } else {
+          await setDoc(doc(db, 'messages', updatedItem.id), updatedItem);
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
+    setTodos(newTodosList);
+    localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
+    if (db && updatedItem) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, 'todos', updatedItem.id));
+        } else {
+          await setDoc(doc(db, 'todos', updatedItem.id), updatedItem);
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateChatMessages = async (newChatList, updatedItem = null) => {
+    setChatMessages(newChatList);
+    localStorage.setItem('hub_chat', JSON.stringify(newChatList));
+    if (db && updatedItem) {
+      try {
+        await setDoc(doc(db, 'chatMessages', updatedItem.id), updatedItem);
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
+    setEvents(newEventsList);
+    localStorage.setItem('hub_events', JSON.stringify(newEventsList));
+    if (db && updatedItem) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, 'events', updatedItem.id));
+        } else {
+          await setDoc(doc(db, 'events', updatedItem.id), updatedItem);
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
+    setFiles(newFilesList);
+    localStorage.setItem('hub_files', JSON.stringify(newFilesList));
+    if (db && updatedItem) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, 'files', updatedItem.id));
+        } else {
+          await setDoc(doc(db, 'files', updatedItem.id), updatedItem);
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
+    setCheckins(newCheckinsList);
+    localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
+    if (db && updatedItem) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, 'checkins', updatedItem.id));
+        } else {
+          await setDoc(doc(db, 'checkins', updatedItem.id), updatedItem);
+        }
+      } catch (e) {}
     }
   };
 
@@ -273,12 +385,10 @@ export default function App() {
     setProjDesc('');
     setShowNewProjectModal(false);
 
-    if (isLiveFirebase && db) {
+    if (db) {
       try {
         await setDoc(doc(db, 'projects', newProject.id), newProject);
-      } catch (err) {
-        console.warn("Firestore project write error:", err);
-      }
+      } catch (err) {}
     }
 
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
@@ -312,12 +422,10 @@ export default function App() {
     setActiveProject(updatedData);
     setShowEditProjectModal(false);
 
-    if (isLiveFirebase && db) {
+    if (db) {
       try {
         await setDoc(doc(db, 'projects', activeProject.id), updatedData);
-      } catch (err) {
-        console.warn("Firestore project update error:", err);
-      }
+      } catch (err) {}
     }
 
     handleAddActivity(`memperbarui informasi proyek`);
@@ -335,12 +443,10 @@ export default function App() {
     }
     setShowDeleteConfirmModal(false);
 
-    if (isLiveFirebase && db) {
+    if (db) {
       try {
         await deleteDoc(doc(db, 'projects', deletedId));
-      } catch (err) {
-        console.warn("Firestore project delete error:", err);
-      }
+      } catch (err) {}
     }
   };
 
@@ -352,12 +458,10 @@ export default function App() {
     setProjects(updatedProjects);
     setActiveProject(updatedProj);
 
-    if (isLiveFirebase && db) {
+    if (db) {
       try {
         await setDoc(doc(db, 'projects', activeProject.id), updatedProj);
-      } catch (err) {
-        console.warn("Firestore member update error:", err);
-      }
+      } catch (err) {}
     }
   };
 
@@ -452,7 +556,7 @@ export default function App() {
             events={events}
             checkins={checkins}
             onSelectProject={handleSelectProjectFromGlobal}
-            setEvents={setEvents}
+            setEvents={(newEvts) => handleUpdateEvents(newEvts)}
           />
         )}
 
@@ -478,8 +582,9 @@ export default function App() {
               {activeTab === 'messages' && (
                 <MessageBoard
                   messages={messages}
-                  setMessages={setMessages}
+                  setMessages={handleUpdateMessages}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                   onAddActivity={handleAddActivity}
                 />
               )}
@@ -487,8 +592,9 @@ export default function App() {
               {activeTab === 'todos' && (
                 <TodoList
                   todos={todos}
-                  setTodos={setTodos}
+                  setTodos={handleUpdateTodos}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                   onAddActivity={handleAddActivity}
                 />
               )}
@@ -496,16 +602,18 @@ export default function App() {
               {activeTab === 'chat' && (
                 <CampfireChat
                   chatMessages={chatMessages}
-                  setChatMessages={setChatMessages}
+                  setChatMessages={handleUpdateChatMessages}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                 />
               )}
 
               {activeTab === 'schedule' && (
                 <ScheduleCalendar
                   events={events}
-                  setEvents={setEvents}
+                  setEvents={handleUpdateEvents}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                   onAddActivity={handleAddActivity}
                 />
               )}
@@ -513,8 +621,9 @@ export default function App() {
               {activeTab === 'files' && (
                 <DocsAndFiles
                   files={files}
-                  setFiles={setFiles}
+                  setFiles={handleUpdateFiles}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                   onAddActivity={handleAddActivity}
                 />
               )}
@@ -522,8 +631,9 @@ export default function App() {
               {activeTab === 'standups' && (
                 <AutomaticCheckins
                   checkins={checkins}
-                  setCheckins={setCheckins}
+                  setCheckins={handleUpdateCheckins}
                   activeProject={activeProject}
+                  currentUser={currentUser}
                 />
               )}
             </>

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2 } from 'lucide-react';
 
-export default function DocsAndFiles({ files, setFiles, activeProject, notify }) {
+export default function DocsAndFiles({ files, setFiles, activeProject, currentUser, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [fileSource, setFileSource] = useState('Google Drive');
   const [previewFile, setPreviewFile] = useState(null);
@@ -10,6 +10,8 @@ export default function DocsAndFiles({ files, setFiles, activeProject, notify })
   const [selectedLocalFile, setSelectedLocalFile] = useState(null);
   const [customFileName, setCustomFileName] = useState('');
   const fileInputRef = useRef(null);
+
+  const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
 
   const getFileIcon = (type) => {
     switch (type) {
@@ -63,10 +65,11 @@ export default function DocsAndFiles({ files, setFiles, activeProject, notify })
       url: fileUrl,
       isLocalObject: !!selectedLocalFile,
       updatedAt: 'Hari ini',
-      author: 'Budi Santoso'
+      author: authorName
     };
 
-    setFiles([newFile, ...files]);
+    const updated = [newFile, ...files];
+    setFiles(updated, newFile, false);
     setSelectedLocalFile(null);
     setCustomFileName('');
     setShowUploadModal(false);
@@ -74,7 +77,9 @@ export default function DocsAndFiles({ files, setFiles, activeProject, notify })
   };
 
   const handleDeleteFile = (fileId) => {
-    setFiles(files.filter(f => f.id !== fileId));
+    const deletedItem = files.find(f => f.id === fileId) || { id: fileId };
+    const remaining = files.filter(f => f.id !== fileId);
+    setFiles(remaining, deletedItem, true);
     if (previewFile?.id === fileId) setPreviewFile(null);
     notify?.('Berkas berhasil dihapus', 'delete');
   };

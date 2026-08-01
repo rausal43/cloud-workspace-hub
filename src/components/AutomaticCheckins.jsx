@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { HelpCircle, Plus, Send, Clock, User, CheckCircle2 } from 'lucide-react';
 
-export default function AutomaticCheckins({ checkins, setCheckins, activeProject, notify }) {
+export default function AutomaticCheckins({ checkins, setCheckins, activeProject, currentUser, notify }) {
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSchedule, setNewSchedule] = useState('Setiap hari kerja jam 16:30');
   
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [answerInput, setAnswerInput] = useState('');
+
+  const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
+  const authorAvatar = currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
   const handleAddQuestion = (e) => {
     e.preventDefault();
@@ -21,7 +24,8 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
       responses: []
     };
 
-    setCheckins([newChk, ...checkins]);
+    const updated = [newChk, ...checkins];
+    setCheckins(updated, newChk, false);
     setNewQuestion('');
     setShowAddQuestionModal(false);
     notify?.('Pertanyaan standup otomatis berhasil ditambahkan!', 'success');
@@ -31,22 +35,25 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
     if (!answerInput.trim()) return;
 
     const newResponse = {
-      author: 'Budi Santoso',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      author: authorName,
+      avatar: authorAvatar,
       time: 'Baru saja',
       answer: answerInput
     };
 
-    setCheckins(checkins.map(chk => {
+    let targetUpdated = null;
+    const updated = checkins.map(chk => {
       if (chk.id === chkId) {
-        return {
+        targetUpdated = {
           ...chk,
-          responses: [newResponse, ...chk.responses]
+          responses: [newResponse, ...(chk.responses || [])]
         };
+        return targetUpdated;
       }
       return chk;
-    }));
+    });
 
+    setCheckins(updated, targetUpdated, false);
     setAnswerInput('');
     setActiveQuestionId(null);
     notify?.('Jawaban standup berhasil dikirim!', 'info');
@@ -83,7 +90,7 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
 
             {/* Answer Feed */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-              {chk.responses.map((resp, idx) => (
+              {(chk.responses || []).map((resp, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: '12px', background: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
                   <img src={resp.avatar} alt={resp.author} className="avatar" />
                   <div>

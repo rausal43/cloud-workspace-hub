@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CheckSquare, Plus, Calendar, User, LayoutGrid, List, CheckCircle2, Circle, Edit3, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function TodoList({ todos, setTodos, activeProject, notify }) {
+export default function TodoList({ todos, setTodos, activeProject, currentUser, notify }) {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -12,22 +12,19 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
   const [editingTask, setEditingTask] = useState(null); // { catId, item }
   
   const [taskText, setTaskText] = useState('');
-  const [taskAssignee, setTaskAssignee] = useState('Rian Hidayat');
+  const [taskAssignee, setTaskAssignee] = useState(currentUser ? currentUser.name : 'Rausal Bahtiar');
   const [taskDueDate, setTaskDueDate] = useState('');
 
   const handleToggleItem = (catId, itemId, e) => {
     if (e) e.stopPropagation();
-    setTodos(todos.map(cat => {
+    let targetUpdatedCat = null;
+    const updated = todos.map(cat => {
       if (cat.id === catId) {
         const updatedItems = cat.items.map(item => {
           if (item.id === itemId) {
             const willBeCompleted = !item.completed;
             if (willBeCompleted) {
-              confetti({
-                particleCount: 40,
-                spread: 60,
-                origin: { y: 0.7 }
-              });
+              confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
               notify?.(`Tugas "${item.text}" selesai 🎉`, 'success');
             } else {
               notify?.(`Status tugas "${item.text}" diperbarui`, 'info');
@@ -36,10 +33,12 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
           }
           return item;
         });
-        return { ...cat, items: updatedItems };
+        targetUpdatedCat = { ...cat, items: updatedItems };
+        return targetUpdatedCat;
       }
       return cat;
-    }));
+    });
+    setTodos(updated, targetUpdatedCat, false);
   };
 
   const handleAddItem = (e) => {
@@ -50,17 +49,20 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
       id: `item-${Date.now()}`,
       text: taskText,
       completed: false,
-      assignee: taskAssignee,
+      assignee: taskAssignee || (currentUser ? currentUser.name : 'Rausal Bahtiar'),
       dueDate: taskDueDate || 'Hari ini'
     };
 
-    setTodos(todos.map(cat => {
+    let targetUpdatedCat = null;
+    const updated = todos.map(cat => {
       if (cat.id === activeCategoryId) {
-        return { ...cat, items: [...cat.items, newItem] };
+        targetUpdatedCat = { ...cat, items: [...cat.items, newItem] };
+        return targetUpdatedCat;
       }
       return cat;
-    }));
+    });
 
+    setTodos(updated, targetUpdatedCat, false);
     setTaskText('');
     setTaskDueDate('');
     setActiveCategoryId(null);
@@ -71,7 +73,7 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
     if (e) e.stopPropagation();
     setEditingTask({ catId, item });
     setTaskText(item.text);
-    setTaskAssignee(item.assignee || 'Budi Santoso');
+    setTaskAssignee(item.assignee || (currentUser ? currentUser.name : 'Rausal Bahtiar'));
     setTaskDueDate(item.dueDate || '');
   };
 
@@ -80,8 +82,9 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
     if (!taskText.trim() || !editingTask) return;
 
     const { catId, item } = editingTask;
+    let targetUpdatedCat = null;
 
-    setTodos(todos.map(cat => {
+    const updated = todos.map(cat => {
       if (cat.id === catId) {
         const updatedItems = cat.items.map(i => {
           if (i.id === item.id) {
@@ -94,11 +97,13 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
           }
           return i;
         });
-        return { ...cat, items: updatedItems };
+        targetUpdatedCat = { ...cat, items: updatedItems };
+        return targetUpdatedCat;
       }
       return cat;
-    }));
+    });
 
+    setTodos(updated, targetUpdatedCat, false);
     setEditingTask(null);
     setTaskText('');
     setTaskDueDate('');
@@ -107,20 +112,25 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
 
   const handleDeleteTask = (catId, itemId, e) => {
     if (e) e.stopPropagation();
-    setTodos(todos.map(cat => {
+    let targetUpdatedCat = null;
+    const updated = todos.map(cat => {
       if (cat.id === catId) {
-        return {
+        targetUpdatedCat = {
           ...cat,
           items: cat.items.filter(i => i.id !== itemId)
         };
+        return targetUpdatedCat;
       }
       return cat;
-    }));
+    });
+    setTodos(updated, targetUpdatedCat, false);
     notify?.('Tugas berhasil dihapus', 'delete');
   };
 
   const handleDeleteCategory = (catId) => {
-    setTodos(todos.filter(c => c.id !== catId));
+    const deletedCat = todos.find(c => c.id === catId) || { id: catId };
+    const remaining = todos.filter(c => c.id !== catId);
+    setTodos(remaining, deletedCat, true);
     notify?.('Grup tugas berhasil dihapus', 'delete');
   };
 
@@ -135,7 +145,8 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
       items: []
     };
 
-    setTodos([...todos, newCategory]);
+    const updated = [...todos, newCategory];
+    setTodos(updated, newCategory, false);
     setNewCategoryName('');
     setShowAddCategoryModal(false);
   };
@@ -387,16 +398,13 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
 
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Penanggung Jawab (Assignee)</label>
-                <select
+                <input
+                  type="text"
                   className="input-field"
                   value={taskAssignee}
                   onChange={(e) => setTaskAssignee(e.target.value)}
-                >
-                  <option value="Budi Santoso">Budi Santoso (Project Lead)</option>
-                  <option value="Siti Rahma">Siti Rahma (UI Designer)</option>
-                  <option value="Rian Hidayat">Rian Hidayat (Frontend)</option>
-                  <option value="Dewi Lestari">Dewi Lestari (QA)</option>
-                </select>
+                  placeholder="Misal: Rausal Bahtiar / Wang"
+                />
               </div>
 
               <div style={{ marginBottom: '20px' }}>
@@ -441,16 +449,12 @@ export default function TodoList({ todos, setTodos, activeProject, notify }) {
 
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Penanggung Jawab (Assignee)</label>
-                <select
+                <input
+                  type="text"
                   className="input-field"
                   value={taskAssignee}
                   onChange={(e) => setTaskAssignee(e.target.value)}
-                >
-                  <option value="Budi Santoso">Budi Santoso (Project Lead)</option>
-                  <option value="Siti Rahma">Siti Rahma (UI Designer)</option>
-                  <option value="Rian Hidayat">Rian Hidayat (Frontend)</option>
-                  <option value="Dewi Lestari">Dewi Lestari (QA)</option>
-                </select>
+                />
               </div>
 
               <div style={{ marginBottom: '20px' }}>
