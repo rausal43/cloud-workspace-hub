@@ -11,19 +11,27 @@ export default function LoginModal({ isOpen, onClose, currentUser, setCurrentUse
 
   if (!isOpen) return null;
 
+  const saveUserSession = (userObj) => {
+    setCurrentUser(userObj);
+    try {
+      localStorage.setItem('hub_currentUser', JSON.stringify(userObj));
+    } catch (e) {}
+  };
+
   const handleGoogleSignIn = async () => {
     if (isLiveFirebase && auth && googleProvider) {
       try {
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
-        setCurrentUser({
+        const userObj = {
           id: user.uid,
           name: user.displayName || 'Pengguna Google',
           email: user.email || 'user@gmail.com',
           avatar: user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
           role: 'Project Lead',
           provider: 'Google OAuth'
-        });
+        };
+        saveUserSession(userObj);
         setSuccessMsg('Berhasil Login dengan akun Google!');
         setTimeout(() => {
           setSuccessMsg('');
@@ -45,16 +53,16 @@ export default function LoginModal({ isOpen, onClose, currentUser, setCurrentUse
   };
 
   const simulateLogin = () => {
-    const user = {
+    const userObj = {
       id: `usr-${Date.now()}`,
-      name: nameInput || 'Budi Santoso',
-      email: emailInput || 'budi.santoso@gmail.com',
+      name: nameInput.trim() || 'Anggota Tim',
+      email: emailInput.trim() || 'budi.santoso@gmail.com',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
       role: roleInput,
       provider: 'Google Workspace'
     };
-    setCurrentUser(user);
-    setSuccessMsg(`Berhasil Login sebagai ${user.name}!`);
+    saveUserSession(userObj);
+    setSuccessMsg(`Berhasil Login sebagai ${userObj.name}!`);
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -75,6 +83,9 @@ export default function LoginModal({ isOpen, onClose, currentUser, setCurrentUse
       }
     }
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('hub_currentUser');
+    } catch (e) {}
     onClose();
   };
 

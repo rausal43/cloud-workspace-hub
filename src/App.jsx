@@ -46,7 +46,7 @@ const INITIAL_ROLES = [
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // User & Auth State (Persisted in LocalStorage)
+  // User & Auth State (Persisted in LocalStorage permanently across refreshes)
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('hub_currentUser');
     if (savedUser) {
@@ -117,6 +117,15 @@ export default function App() {
   const [projDesc, setProjDesc] = useState('');
   const [projCat, setProjCat] = useState('Productivity');
   const [projColor, setProjColor] = useState('#1a73e8');
+
+  // Always Sync currentUser to LocalStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('hub_currentUser');
+    }
+  }, [currentUser]);
 
   // =========================================================
   // ⚡ FIRESTORE REALTIME SYNC LISTENERS (`onSnapshot`)
@@ -360,22 +369,26 @@ export default function App() {
           // Switch Active Project directly to targetProj!
           setActiveProject(targetProj);
 
-          // Update member status to 'joined'
-          const memberEmail = currentUser ? currentUser.email : (inviteEmail || 'oukiwang72@gmail.com');
+          // Resolve Member Email: Use logged-in currentUser if present, or clean inviteEmail
+          let resolvedEmail = currentUser ? currentUser.email : inviteEmail;
+          if (!resolvedEmail || resolvedEmail === 'user') {
+            resolvedEmail = 'oukiwang72@gmail.com';
+          }
+
           const existingMembers = targetProj.members || [];
           
           const updatedMembers = existingMembers.map(m => {
-            if (m.email?.toLowerCase() === memberEmail?.toLowerCase()) {
+            if (m.email?.toLowerCase() === resolvedEmail?.toLowerCase()) {
               return { ...m, status: 'joined' };
             }
             return m;
           });
 
-          const hasMember = existingMembers.some(m => m.email?.toLowerCase() === memberEmail?.toLowerCase());
+          const hasMember = existingMembers.some(m => m.email?.toLowerCase() === resolvedEmail?.toLowerCase());
           if (!hasMember) {
             updatedMembers.push({
-              name: currentUser ? currentUser.name : (inviteEmail ? inviteEmail.split('@')[0] : 'Wang'),
-              email: memberEmail,
+              name: currentUser ? currentUser.name : resolvedEmail.split('@')[0],
+              email: resolvedEmail,
               avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
               role: inviteRoleName,
               status: 'joined'
@@ -389,7 +402,7 @@ export default function App() {
 
       processInviteLink();
     }
-  }, [isDarkMode]);
+  }, [isDarkMode, currentUser]);
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
