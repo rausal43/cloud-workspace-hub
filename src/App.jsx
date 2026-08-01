@@ -127,112 +127,58 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // =========================================================
-  // ⚡ FIRESTORE REALTIME SYNC LISTENERS (`onSnapshot`)
-  // =========================================================
-  useEffect(() => {
-    if (!db) return;
-
-    // Seed active projects to Firestore Cloud on start
-    projects.forEach(async (p) => {
+  // Centralized Cloud Sync function (writes to Cloudflare Pages API & Firebase)
+  const syncDocumentToCloud = async (col, docId, data, isDelete = false) => {
+    if (db) {
       try {
-        await setDoc(doc(db, 'projects', p.id), p, { merge: true });
+        if (isDelete) await deleteDoc(doc(db, col, docId));
+        else await setDoc(doc(db, col, docId), data, { merge: true });
       } catch (e) {}
-    });
+    }
+    try {
+      await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection: col, docId, data, isDelete })
+      });
+    } catch (e) {}
+  };
 
-    // 1. Projects Realtime Listener
-    const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setProjects(cloudProj);
-        localStorage.setItem('hub_projects', JSON.stringify(cloudProj));
-
-        setActiveProject(prev => {
-          if (!prev) return cloudProj[0];
-          const updated = cloudProj.find(p => p.id === prev.id);
-          return updated || cloudProj[0];
-        });
-      }
-    });
-
-    // 2. Activities Realtime Listener
-    const unsubActivities = onSnapshot(collection(db, 'activities'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudAct = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        cloudAct.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setActivities(cloudAct);
-        localStorage.setItem('hub_activities', JSON.stringify(cloudAct));
-      }
-    });
-
-    // 3. Todos Realtime Listener
-    const unsubTodos = onSnapshot(collection(db, 'todos'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudTodos = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setTodos(cloudTodos);
-        localStorage.setItem('hub_todos', JSON.stringify(cloudTodos));
-      }
-    });
-
-    // 4. Messages Realtime Listener
-    const unsubMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudMsg = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setMessages(cloudMsg);
-        localStorage.setItem('hub_messages', JSON.stringify(cloudMsg));
-      }
-    });
-
-    // 5. Chat Messages Realtime Listener
-    const unsubChat = onSnapshot(collection(db, 'chatMessages'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudChat = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        cloudChat.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-        setChatMessages(cloudChat);
-        localStorage.setItem('hub_chat', JSON.stringify(cloudChat));
-      }
-    });
-
-    // 6. Events Realtime Listener
-    const unsubEvents = onSnapshot(collection(db, 'events'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudEvents = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setEvents(cloudEvents);
-        localStorage.setItem('hub_events', JSON.stringify(cloudEvents));
-      }
-    });
-
-    // 7. Files Realtime Listener
-    const unsubFiles = onSnapshot(collection(db, 'files'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudFiles = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setFiles(cloudFiles);
-        localStorage.setItem('hub_files', JSON.stringify(cloudFiles));
-      }
-    });
-
-    // 8. Checkins Realtime Listener
-    const unsubCheckins = onSnapshot(collection(db, 'checkins'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudCheck = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setCheckins(cloudCheck);
-        localStorage.setItem('hub_checkins', JSON.stringify(cloudCheck));
-      }
-    });
-
-    return () => {
-      unsubProjects();
-      unsubActivities();
-      unsubTodos();
-      unsubMessages();
-      unsubChat();
-      unsubEvents();
-      unsubFiles();
-      unsubCheckins();
+  // Background Cloud Sync Poller (Syncs all devices worldwide every 2 seconds)
+  useEffect(() => {
+    const fetchCloudData = async () => {
+      try {
+        const res = await fetch('/api/sync');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            if (json.data.projects && json.data.projects.length > 0) {
+              setProjects(json.data.projects);
+              localStorage.setItem('hub_projects', JSON.stringify(json.data.projects));
+              setActiveProject(prev => {
+                if (!prev) return json.data.projects[0];
+                const updated = json.data.projects.find(p => p.id === prev.id);
+                return updated || json.data.projects[0];
+              });
+            }
+            if (json.data.messages) setMessages(json.data.messages);
+            if (json.data.todos) setTodos(json.data.todos);
+            if (json.data.chatMessages) setChatMessages(json.data.chatMessages);
+            if (json.data.events) setEvents(json.data.events);
+            if (json.data.files) setFiles(json.data.files);
+            if (json.data.checkins) setCheckins(json.data.checkins);
+            if (json.data.activities) setActivities(json.data.activities);
+          }
+        }
+      } catch (e) {}
     };
+
+    fetchCloudData();
+    const interval = setInterval(fetchCloudData, 2500);
+    return () => clearInterval(interval);
   }, []);
 
-  // Helper to add real activity log and write to Cloud Firestore
+  // Helper to add real activity log and write to Cloud Server
   const handleAddActivity = async (actionText) => {
     const newAct = {
       id: `act-${Date.now()}`,
@@ -242,93 +188,44 @@ export default function App() {
       createdAt: Date.now()
     };
     setActivities(prev => [newAct, ...prev]);
-
-    if (db) {
-      try {
-        await setDoc(doc(db, 'activities', newAct.id), newAct);
-      } catch (err) {}
-    }
+    syncDocumentToCloud('activities', newAct.id, newAct);
   };
 
-  // State sync wrapper functions for child modules to write to Firestore
+  // State sync wrapper functions for child modules
   const handleUpdateMessages = async (newMessagesList, updatedItem = null, isDelete = false) => {
     setMessages(newMessagesList);
     localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, 'messages', updatedItem.id));
-        } else {
-          await setDoc(doc(db, 'messages', updatedItem.id), updatedItem);
-        }
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('messages', updatedItem.id, updatedItem, isDelete);
   };
 
   const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
     setTodos(newTodosList);
     localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, 'todos', updatedItem.id));
-        } else {
-          await setDoc(doc(db, 'todos', updatedItem.id), updatedItem);
-        }
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('todos', updatedItem.id, updatedItem, isDelete);
   };
 
   const handleUpdateChatMessages = async (newChatList, updatedItem = null) => {
     setChatMessages(newChatList);
     localStorage.setItem('hub_chat', JSON.stringify(newChatList));
-    if (db && updatedItem) {
-      try {
-        await setDoc(doc(db, 'chatMessages', updatedItem.id), updatedItem);
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('chatMessages', updatedItem.id, updatedItem);
   };
 
   const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
     setEvents(newEventsList);
     localStorage.setItem('hub_events', JSON.stringify(newEventsList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, 'events', updatedItem.id));
-        } else {
-          await setDoc(doc(db, 'events', updatedItem.id), updatedItem);
-        }
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('events', updatedItem.id, updatedItem, isDelete);
   };
 
   const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
     setFiles(newFilesList);
     localStorage.setItem('hub_files', JSON.stringify(newFilesList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, 'files', updatedItem.id));
-        } else {
-          await setDoc(doc(db, 'files', updatedItem.id), updatedItem);
-        }
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('files', updatedItem.id, updatedItem, isDelete);
   };
 
   const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
     setCheckins(newCheckinsList);
     localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
-    if (db && updatedItem) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, 'checkins', updatedItem.id));
-        } else {
-          await setDoc(doc(db, 'checkins', updatedItem.id), updatedItem);
-        }
-      } catch (e) {}
-    }
+    if (updatedItem) syncDocumentToCloud('checkins', updatedItem.id, updatedItem, isDelete);
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -343,21 +240,19 @@ export default function App() {
 
     if (inviteProjId) {
       const processInviteLink = async () => {
-        let targetProj = null;
+        let targetProj = projects.find(p => p.id === inviteProjId);
 
-        // Fetch directly from Cloud Firestore FIRST to get real updated project (e.g. 'Beon')
-        if (db) {
-          try {
-            const docSnap = await getDoc(doc(db, 'projects', inviteProjId));
-            if (docSnap.exists()) {
-              targetProj = { id: docSnap.id, ...docSnap.data() };
+        // Fetch directly from Cloud Server FIRST to get real updated project (e.g. 'Beon')
+        try {
+          const res = await fetch(`/api/sync?collection=projects`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.data) {
+              const cloudTarget = json.data.find(p => p.id === inviteProjId);
+              if (cloudTarget) targetProj = cloudTarget;
             }
-          } catch (e) {}
-        }
-
-        if (!targetProj) {
-          targetProj = projects.find(p => p.id === inviteProjId);
-        }
+          }
+        } catch (e) {}
 
         if (targetProj) {
           // Resolve Member Email: Use logged-in currentUser if present, or clean inviteEmail
@@ -395,13 +290,8 @@ export default function App() {
           });
           setActiveProject(finalProj);
 
-          // Write updated finalProj back to Cloud Firestore so inviter receives status 'joined' in real-time!
-          if (db) {
-            try {
-              await setDoc(doc(db, 'projects', finalProj.id), finalProj);
-            } catch (e) {}
-          }
-
+          // Write updated finalProj back to Cloud Server so inviter receives status 'joined' in real-time!
+          syncDocumentToCloud('projects', finalProj.id, finalProj);
           handleAddActivity(`bergabung ke dalam tim proyek "${finalProj.name}" via link undangan`);
         }
       };
@@ -440,12 +330,7 @@ export default function App() {
     setProjDesc('');
     setShowNewProjectModal(false);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', newProject.id), newProject);
-      } catch (err) {}
-    }
-
+    syncDocumentToCloud('projects', newProject.id, newProject);
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -477,12 +362,7 @@ export default function App() {
     setActiveProject(updatedData);
     setShowEditProjectModal(false);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', activeProject.id), updatedData);
-      } catch (err) {}
-    }
-
+    syncDocumentToCloud('projects', activeProject.id, updatedData);
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
@@ -498,11 +378,7 @@ export default function App() {
     }
     setShowDeleteConfirmModal(false);
 
-    if (db) {
-      try {
-        await deleteDoc(doc(db, 'projects', deletedId));
-      } catch (err) {}
-    }
+    syncDocumentToCloud('projects', deletedId, null, true);
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
@@ -513,11 +389,7 @@ export default function App() {
     setProjects(updatedProjects);
     setActiveProject(updatedProj);
 
-    if (db) {
-      try {
-        await setDoc(doc(db, 'projects', activeProject.id), updatedProj);
-      } catch (err) {}
-    }
+    syncDocumentToCloud('projects', activeProject.id, updatedProj);
   };
 
   const handleSelectProjectFromGlobal = (projId) => {
