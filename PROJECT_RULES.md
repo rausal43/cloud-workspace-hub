@@ -13,3 +13,7 @@
 3. **ENVIRONMENT VARIABLES FOR CREDENTIALS**:
    - ALL database keys, API endpoints, and secret credentials MUST strictly come from `.env` environment variables.
    - NEVER create UI input modals or main-page forms to input secret API keys.
+
+4. **DYNAMIC GMAIL TEAM MEMBER INTEGRATION**:
+   - ALL features requiring assignees, authors, or participants (Task Manager, Calendar, Standups, Messages, Files) MUST dynamically populate options from `activeProject.members` (invited Gmail team members).
+   - NEVER hardcode static default names in forms; fallback to `currentUser.name` or the first member of `activeProject.members`.
