@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { 
-  FolderKanban, 
-  Database, 
-  Sun, 
-  Moon, 
-  Settings, 
-  Grid, 
+  FolderGit2, 
   Plus, 
-  ChevronDown,
+  ChevronDown, 
+  Moon, 
+  Sun, 
+  Database, 
+  LogOut, 
+  UserCheck, 
+  Settings, 
+  Edit3, 
+  Trash2, 
+  Users,
+  Shield,
   Layers,
-  Edit3,
-  Trash2,
-  User,
-  LogIn,
-  LogOut,
-  Users
+  Server
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -24,151 +24,191 @@ export default function Navbar({
   isDarkMode, 
   setIsDarkMode, 
   onOpenSettings,
+  onOpenSupabaseModal,
   onNewProject,
   onEditProject,
   onDeleteProject,
   onOpenLoginModal,
   onOpenTeamModal,
   currentUser,
-  isLiveFirebase
+  isLiveFirebase,
+  isLiveSupabase
 }) {
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem('hub_currentUser');
+    window.location.reload();
+  };
 
   return (
-    <header className="app-header" style={{
+    <header style={{
+      background: 'var(--bg-card)',
+      borderBottom: '1px solid var(--border-color)',
+      padding: '12px 24px',
       position: 'sticky',
       top: 0,
-      zIndex: 100,
-      background: 'var(--bg-glass)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      borderBottom: '1px solid var(--border-color)',
-      padding: '0 24px',
-      height: '64px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
+      zIndex: 100
     }}>
-      {/* Left: Brand Logo & Project Switcher */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        {/* Google Project Hub Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <div style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '8px',
-            background: 'linear-gradient(135deg, #1a73e8 0%, #34a853 50%, #fbbc04 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: 'bold',
-            flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
-          }}>
-            <Layers size={18} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span className="brand-title" style={{ fontWeight: 800, fontSize: '1rem', letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
+      <div style={{
+        maxWidth: '1280px',
+        margin: '0 auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        {/* Left Section: Brand & Project Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'linear-gradient(135deg, #1a73e8, #34a853)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              fontWeight: 800,
+              boxShadow: '0 2px 8px rgba(26, 115, 232, 0.3)'
+            }}>
+              <FolderGit2 size={20} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.3px', margin: 0 }}>
                 Google Cloud Hub
+              </h1>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '-2px' }}>
+                Integrated Firebase & Drive Platform
               </span>
             </div>
-            <span className="brand-subtext" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-              Integrated Firebase & Drive Platform
-            </span>
           </div>
-        </div>
 
-        <div className="divider-hide-mobile" style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
+          {/* Vertical Divider */}
+          <div style={{ width: '1px', height: '24px', background: 'var(--border-color)' }} />
 
-        {/* Project Selector Dropdown & Quick Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Project Dropdown Selector */}
           <div style={{ position: 'relative' }}>
-            <button 
-              className="btn btn-secondary project-selector-btn"
-              onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-              style={{ borderRadius: 'var(--radius-md)', padding: '5px 10px', gap: '6px' }}
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                background: 'var(--bg-main)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)'
+              }}
             >
-              <div style={{
+              <span style={{
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                flexShrink: 0,
-                backgroundColor: activeProject?.color || 'var(--g-blue)'
+                background: activeProject?.color || 'var(--g-blue)'
               }} />
-              <span style={{ fontWeight: 600, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeProject ? activeProject.name : 'Pilih Proyek'}
-              </span>
-              <ChevronDown size={14} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+              <span>{activeProject?.name || 'Pilih Proyek'}</span>
+              <ChevronDown size={14} color="var(--text-secondary)" />
             </button>
 
-            {showProjectDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)',
-                left: 0,
-                width: '260px',
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '8px',
-                zIndex: 200
-              }}>
-                <div style={{ padding: '6px 10px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+            {/* Dropdown Menu */}
+            {showDropdown && (
+              <div
+                className="dropdown-menu-mobile glass-card"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '6px',
+                  width: '260px',
+                  zIndex: 200,
+                  padding: '8px',
+                  boxShadow: 'var(--shadow-md)'
+                }}
+              >
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', padding: '6px 8px' }}>
                   DAFTAR PROYEK AKTIF
                 </div>
-                {projects.map((proj) => (
-                  <div
+                {projects.map(proj => (
+                  <button
                     key={proj.id}
                     onClick={() => {
                       setActiveProject(proj);
-                      setShowProjectDropdown(false);
+                      setShowDropdown(false);
                     }}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
+                      width: '100%',
+                      textAlign: 'left',
                       padding: '8px 10px',
                       borderRadius: 'var(--radius-sm)',
+                      background: activeProject?.id === proj.id ? 'var(--g-blue-light)' : 'transparent',
+                      color: activeProject?.id === proj.id ? 'var(--g-blue)' : 'var(--text-primary)',
+                      border: 'none',
                       cursor: 'pointer',
-                      background: activeProject?.id === proj.id ? 'var(--bg-surface-hover)' : 'transparent',
-                      transition: 'background 0.15s'
+                      fontSize: '0.85rem',
+                      fontWeight: activeProject?.id === proj.id ? 700 : 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: proj.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{proj.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{proj.category}</div>
+                    <span style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: proj.color || 'var(--g-blue)'
+                    }} />
+                    <div>
+                      <div>{proj.name}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>{proj.category}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
 
-                <hr style={{ margin: '8px 0', borderColor: 'var(--border-subtle)' }} />
+                <div style={{ borderTop: '1px solid var(--border-color)', margin: '6px 0' }} />
 
                 <button
-                  className="btn btn-secondary"
                   onClick={() => {
-                    setShowProjectDropdown(false);
+                    setShowDropdown(false);
                     onNewProject();
                   }}
-                  style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.85rem' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    color: 'var(--g-blue)',
+                    border: '1px dashed var(--g-blue)',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
                 >
-                  <Plus size={16} /> Buat Proyek Baru
+                  <Plus size={14} /> Buat Proyek Baru
                 </button>
               </div>
             )}
           </div>
 
-          {/* Quick Edit & Delete Project Actions */}
+          {/* Quick Active Project Actions */}
           {activeProject && (
-            <div style={{ display: 'flex', gap: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <button
                 className="btn-icon"
                 onClick={onEditProject}
-                title="Edit Proyek Ini"
+                title="Edit Nama/Deskripsi Proyek"
                 style={{ padding: '5px' }}
               >
                 <Edit3 size={15} color="var(--text-secondary)" />
@@ -176,7 +216,7 @@ export default function Navbar({
               <button
                 className="btn-icon"
                 onClick={onDeleteProject}
-                title="Hapus Proyek Ini"
+                title="Hapus Proyek"
                 style={{ padding: '5px' }}
               >
                 <Trash2 size={15} color="var(--g-red)" />
@@ -192,111 +232,143 @@ export default function Navbar({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Right Actions: Firebase status, Theme Toggle, Profile */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {/* Firebase Status Badge */}
-        <button
-          onClick={onOpenSettings}
-          className="btn"
-          style={{
-            background: 'var(--g-green-light)',
-            color: 'var(--g-green)',
-            border: '1px solid rgba(52,168,83,0.3)',
-            padding: '4px 10px',
-            fontSize: '0.78rem',
-            borderRadius: '20px'
-          }}
-          title="Konfigurasi Google Firebase & Drive API"
-        >
-          <Database size={13} />
-          <span className="badge-text-mobile-hide">{isLiveFirebase ? 'Firebase Live' : 'Cloud Database Active'}</span>
-          <Settings size={13} style={{ marginLeft: '2px', opacity: 0.7 }} />
-        </button>
+        {/* Right Actions: Database Status, Theme Toggle, Profile */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Supabase PostgreSQL Badge Button */}
+          <button
+            onClick={onOpenSupabaseModal}
+            className="btn"
+            style={{
+              background: isLiveSupabase ? 'rgba(52, 168, 83, 0.15)' : 'rgba(26, 115, 232, 0.1)',
+              color: isLiveSupabase ? 'var(--g-green)' : 'var(--g-blue)',
+              border: `1px solid ${isLiveSupabase ? 'rgba(52,168,83,0.4)' : 'rgba(26,115,232,0.4)'}`,
+              padding: '4px 10px',
+              fontSize: '0.78rem',
+              borderRadius: '20px',
+              fontWeight: 700
+            }}
+            title="Konfigurasi Database PostgreSQL Supabase"
+          >
+            <Server size={13} />
+            <span>{isLiveSupabase ? 'SQL Live (Supabase)' : 'Connect Supabase (SQL)'}</span>
+            <Settings size={13} style={{ marginLeft: '2px', opacity: 0.7 }} />
+          </button>
 
-        {/* Theme Toggle */}
-        <button
-          className="btn-icon"
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          title="Ganti Tema (Dark / Light)"
-          style={{ padding: '6px' }}
-        >
-          {isDarkMode ? <Sun size={18} color="#fbbc04" /> : <Moon size={18} />}
-        </button>
+          {/* Theme Toggle */}
+          <button
+            className="btn-icon"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            title={isDarkMode ? 'Mode Terang' : 'Mode Gelap'}
+          >
+            {isDarkMode ? <Sun size={18} color="var(--g-yellow)" /> : <Moon size={18} />}
+          </button>
 
-        {/* User Profile Dropdown / Login Button */}
-        <div style={{ position: 'relative' }}>
-          {currentUser ? (
-            <div 
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 4px', borderRadius: '20px' }}
-            >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="avatar"
-                style={{ width: '32px', height: '32px', border: '2px solid var(--g-blue)' }}
-              />
-              <ChevronDown size={14} color="var(--text-secondary)" />
-            </div>
-          ) : (
-            <button
-              className="btn btn-primary"
-              onClick={onOpenLoginModal}
-              style={{ padding: '4px 12px', fontSize: '0.85rem' }}
-            >
-              <LogIn size={14} /> Login Google
-            </button>
-          )}
-
-          {showUserDropdown && currentUser && (
-            <div style={{
-              position: 'absolute',
-              top: 'calc(100% + 8px)',
-              right: 0,
-              width: '240px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)',
-              padding: '12px',
-              zIndex: 200
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                <img src={currentUser.avatar} alt={currentUser.name} className="avatar" />
-                <div style={{ overflow: 'hidden' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', textOverflow: 'ellipsis', overflow: 'hidden' }}>{currentUser.name}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{currentUser.email}</div>
-                  <span className="badge badge-blue" style={{ marginTop: '2px', fontSize: '0.65rem' }}>{currentUser.role}</span>
-                </div>
+          {/* User Profile / Login */}
+          <div style={{ position: 'relative' }}>
+            {currentUser ? (
+              <div
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                  borderRadius: '20px',
+                  background: 'var(--bg-main)',
+                  border: '1px solid var(--border-color)'
+                }}
+              >
+                <img
+                  src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'}
+                  alt={currentUser.name}
+                  className="avatar"
+                  style={{ width: '28px', height: '28px' }}
+                />
+                <span className="badge-text-mobile-hide" style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                  {currentUser.name}
+                </span>
+                <ChevronDown size={14} color="var(--text-secondary)" />
               </div>
-
-              <hr style={{ margin: '8px 0', borderColor: 'var(--border-subtle)' }} />
-
+            ) : (
               <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowUserDropdown(false);
-                  onOpenTeamModal();
-                }}
-                style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', marginBottom: '6px' }}
+                className="btn btn-primary"
+                onClick={onOpenLoginModal}
+                style={{ padding: '6px 12px', fontSize: '0.82rem' }}
               >
-                <Users size={14} /> Undang Tim Gmail
+                <UserCheck size={14} /> Masuk Akun
               </button>
+            )}
 
-              <button
-                className="btn btn-secondary"
-                onClick={() => {
-                  setShowUserDropdown(false);
-                  onOpenLoginModal();
+            {/* User Account Menu */}
+            {showUserMenu && currentUser && (
+              <div
+                className="dropdown-menu-mobile glass-card"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  width: '220px',
+                  zIndex: 200,
+                  padding: '12px',
+                  boxShadow: 'var(--shadow-md)'
                 }}
-                style={{ width: '100%', justifyContent: 'flex-start', fontSize: '0.8rem', color: 'var(--g-red)' }}
               >
-                <LogOut size={14} /> Sign Out / Ganti Akun
-              </button>
-            </div>
-          )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  <img src={currentUser.avatar} alt={currentUser.name} className="avatar" />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem' }}>{currentUser.name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{currentUser.email}</div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-color)', margin: '8px 0' }} />
+
+                <button
+                  onClick={onOpenTeamModal}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Users size={14} color="var(--g-blue)" /> Kelola Anggota Tim
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    color: 'var(--g-red)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginTop: '4px'
+                  }}
+                >
+                  <LogOut size={14} /> Sign Out / Ganti Akun
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

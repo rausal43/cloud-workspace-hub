@@ -9,6 +9,7 @@ import DocsAndFiles from './components/DocsAndFiles';
 import AutomaticCheckins from './components/AutomaticCheckins';
 import GlobalDashboard from './components/GlobalDashboard';
 import FirebaseSettingsModal from './components/FirebaseSettingsModal';
+import SupabaseSettingsModal from './components/SupabaseSettingsModal';
 import LoginModal from './components/LoginModal';
 import TeamManagerModal from './components/TeamManagerModal';
 
@@ -32,6 +33,8 @@ import {
   getDoc,
   deleteDoc
 } from './firebase';
+
+import { supabase, isLiveSupabase } from './supabase';
 
 import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
 
@@ -106,6 +109,7 @@ export default function App() {
 
   // Modals state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showSupabaseModal, setShowSupabaseModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -126,6 +130,47 @@ export default function App() {
       localStorage.removeItem('hub_currentUser');
     }
   }, [currentUser]);
+
+  // Supabase PostgreSQL Realtime Sync Engine
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Fetch initial tables from Supabase PostgreSQL
+    const fetchSupabaseTables = async () => {
+      try {
+        const { data: projData } = await supabase.from('projects').select('*');
+        if (projData && projData.length > 0) {
+          setProjects(projData);
+          localStorage.setItem('hub_projects', JSON.stringify(projData));
+        }
+
+        const { data: msgData } = await supabase.from('messages').select('*');
+        if (msgData) {
+          setMessages(msgData);
+          localStorage.setItem('hub_messages', JSON.stringify(msgData));
+        }
+
+        const { data: chatData } = await supabase.from('chatMessages').select('*');
+        if (chatData) {
+          setChatMessages(chatData);
+          localStorage.setItem('hub_chat', JSON.stringify(chatData));
+        }
+      } catch (e) {}
+    };
+
+    fetchSupabaseTables();
+
+    // Subscribe to Supabase Realtime Channel
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        fetchSupabaseTables();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // BroadcastChannel for instant same-browser cross-tab sync
   useEffect(() => {
@@ -153,6 +198,28 @@ export default function App() {
     };
   }, []);
 
+  const syncStateToDatabases = async (table, item, isDelete = false) => {
+    if (supabase) {
+      try {
+        if (isDelete) {
+          await supabase.from(table).delete().eq('id', item.id);
+        } else {
+          await supabase.from(table).upsert(item);
+        }
+      } catch (e) {}
+    }
+
+    if (db && item) {
+      try {
+        if (isDelete) {
+          await deleteDoc(doc(db, table, item.id));
+        } else {
+          await setDoc(doc(db, table, item.id), item, { merge: true });
+        }
+      } catch (e) {}
+    }
+  };
+
   const broadcastSync = (overrideState = {}) => {
     const payload = {
       projects: overrideState.projects || projects,
@@ -169,45 +236,7 @@ export default function App() {
       bc.postMessage({ type: 'SYNC_ALL', payload });
       bc.close();
     } catch (e) {}
-
-    if (db) {
-      try {
-        (payload.projects || []).forEach(p => setDoc(doc(db, 'projects', p.id), p, { merge: true }));
-      } catch (e) {}
-    }
   };
-
-  // Firestore Realtime Listener fallback if db is connected
-  useEffect(() => {
-    if (!db) return;
-
-    const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudProj = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setProjects(cloudProj);
-      }
-    });
-
-    const unsubMessages = onSnapshot(collection(db, 'messages'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudMsg = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setMessages(cloudMsg);
-      }
-    });
-
-    const unsubChat = onSnapshot(collection(db, 'chatMessages'), (snapshot) => {
-      if (!snapshot.empty) {
-        const cloudChat = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
-        setChatMessages(cloudChat);
-      }
-    });
-
-    return () => {
-      unsubProjects();
-      unsubMessages();
-      unsubChat();
-    };
-  }, []);
 
   // Helper to add real activity log
   const handleAddActivity = async (actionText) => {
@@ -222,43 +251,50 @@ export default function App() {
     setActivities(updatedActs);
     localStorage.setItem('hub_activities', JSON.stringify(updatedActs));
     broadcastSync({ activities: updatedActs });
+    syncStateToDatabases('activities', newAct);
   };
 
-  // State sync wrapper functions for child modules (Instant local + broadcast sync)
-  const handleUpdateMessages = async (newMessagesList) => {
+  // State sync wrapper functions for child modules
+  const handleUpdateMessages = async (newMessagesList, updatedItem = null, isDelete = false) => {
     setMessages(newMessagesList);
     localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
     broadcastSync({ messages: newMessagesList });
+    if (updatedItem) syncStateToDatabases('messages', updatedItem, isDelete);
   };
 
-  const handleUpdateTodos = async (newTodosList) => {
+  const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
     setTodos(newTodosList);
     localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
     broadcastSync({ todos: newTodosList });
+    if (updatedItem) syncStateToDatabases('todos', updatedItem, isDelete);
   };
 
-  const handleUpdateChatMessages = async (newChatList) => {
+  const handleUpdateChatMessages = async (newChatList, updatedItem = null, isDelete = false) => {
     setChatMessages(newChatList);
     localStorage.setItem('hub_chat', JSON.stringify(newChatList));
     broadcastSync({ chatMessages: newChatList });
+    if (updatedItem) syncStateToDatabases('chatMessages', updatedItem, isDelete);
   };
 
-  const handleUpdateEvents = async (newEventsList) => {
+  const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
     setEvents(newEventsList);
     localStorage.setItem('hub_events', JSON.stringify(newEventsList));
     broadcastSync({ events: newEventsList });
+    if (updatedItem) syncStateToDatabases('events', updatedItem, isDelete);
   };
 
-  const handleUpdateFiles = async (newFilesList) => {
+  const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
     setFiles(newFilesList);
     localStorage.setItem('hub_files', JSON.stringify(newFilesList));
     broadcastSync({ files: newFilesList });
+    if (updatedItem) syncStateToDatabases('files', updatedItem, isDelete);
   };
 
-  const handleUpdateCheckins = async (newCheckinsList) => {
+  const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
     setCheckins(newCheckinsList);
     localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
     broadcastSync({ checkins: newCheckinsList });
+    if (updatedItem) syncStateToDatabases('checkins', updatedItem, isDelete);
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -306,6 +342,7 @@ export default function App() {
         setProjects(updatedProjects);
         setActiveProject(finalProj);
         broadcastSync({ projects: updatedProjects });
+        syncStateToDatabases('projects', finalProj);
       }
     }
   }, [isDarkMode, currentUser]);
@@ -341,6 +378,7 @@ export default function App() {
     setShowNewProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
+    syncStateToDatabases('projects', newProject);
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -373,6 +411,7 @@ export default function App() {
     setShowEditProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
+    syncStateToDatabases('projects', updatedData);
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
@@ -389,6 +428,7 @@ export default function App() {
     setShowDeleteConfirmModal(false);
 
     broadcastSync({ projects: remaining });
+    syncStateToDatabases('projects', activeProject, true);
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
@@ -400,6 +440,7 @@ export default function App() {
     setActiveProject(updatedProj);
 
     broadcastSync({ projects: updatedProjects });
+    syncStateToDatabases('projects', updatedProj);
   };
 
   const handleSelectProjectFromGlobal = (projId) => {
@@ -431,6 +472,7 @@ export default function App() {
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onOpenSettings={() => setShowSettingsModal(true)}
+        onOpenSupabaseModal={() => setShowSupabaseModal(true)}
         onNewProject={() => {
           setProjName('');
           setProjDesc('');
@@ -442,6 +484,7 @@ export default function App() {
         onOpenTeamModal={() => setShowTeamModal(true)}
         currentUser={currentUser}
         isLiveFirebase={isLiveFirebase}
+        isLiveSupabase={isLiveSupabase}
       />
 
       {/* Main Container */}
@@ -605,11 +648,17 @@ export default function App() {
         onAddActivity={handleAddActivity}
       />
 
-      {/* Settings Modal */}
+      {/* Firebase Settings Modal */}
       <FirebaseSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         isLiveFirebase={isLiveFirebase}
+      />
+
+      {/* Supabase PostgreSQL Database Settings Modal */}
+      <SupabaseSettingsModal
+        isOpen={showSupabaseModal}
+        onClose={() => setShowSupabaseModal(false)}
       />
 
       {/* New Project Modal */}
