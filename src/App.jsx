@@ -21,16 +21,6 @@ import {
   INITIAL_CHECKINS
 } from './data/mockData';
 
-import { 
-  db, 
-  collection, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  getDoc,
-  deleteDoc
-} from './firebase';
-
 import { supabase } from './supabase';
 
 import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
@@ -126,16 +116,23 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Supabase PostgreSQL Realtime Sync Engine (strictly configured via .env)
+  // =========================================================
+  // ⚡ SUPABASE POSTGRESQL REALTIME SYNC ENGINE (SOLE DATABASE)
+  // =========================================================
   useEffect(() => {
     if (!supabase) return;
 
-    const fetchSupabaseTables = async () => {
+    const fetchAllSupabaseTables = async () => {
       try {
         const { data: projData } = await supabase.from('projects').select('*');
         if (projData && projData.length > 0) {
           setProjects(projData);
           localStorage.setItem('hub_projects', JSON.stringify(projData));
+          setActiveProject(prev => {
+            if (!prev) return projData[0];
+            const found = projData.find(p => p.id === prev.id);
+            return found || projData[0];
+          });
         }
 
         const { data: msgData } = await supabase.from('messages').select('*');
@@ -144,19 +141,50 @@ export default function App() {
           localStorage.setItem('hub_messages', JSON.stringify(msgData));
         }
 
+        const { data: todoData } = await supabase.from('todos').select('*');
+        if (todoData) {
+          setTodos(todoData);
+          localStorage.setItem('hub_todos', JSON.stringify(todoData));
+        }
+
         const { data: chatData } = await supabase.from('chatMessages').select('*');
         if (chatData) {
           setChatMessages(chatData);
           localStorage.setItem('hub_chat', JSON.stringify(chatData));
         }
+
+        const { data: fileData } = await supabase.from('files').select('*');
+        if (fileData) {
+          setFiles(fileData);
+          localStorage.setItem('hub_files', JSON.stringify(fileData));
+        }
+
+        const { data: eventData } = await supabase.from('events').select('*');
+        if (eventData) {
+          setEvents(eventData);
+          localStorage.setItem('hub_events', JSON.stringify(eventData));
+        }
+
+        const { data: checkinData } = await supabase.from('checkins').select('*');
+        if (checkinData) {
+          setCheckins(checkinData);
+          localStorage.setItem('hub_checkins', JSON.stringify(checkinData));
+        }
+
+        const { data: actData } = await supabase.from('activities').select('*');
+        if (actData) {
+          setActivities(actData);
+          localStorage.setItem('hub_activities', JSON.stringify(actData));
+        }
       } catch (e) {}
     };
 
-    fetchSupabaseTables();
+    fetchAllSupabaseTables();
 
-    const channel = supabase.channel('schema-db-changes')
+    // Subscribe to Supabase Realtime Channel
+    const channel = supabase.channel('supabase-realtime-all')
       .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        fetchSupabaseTables();
+        fetchAllSupabaseTables();
       })
       .subscribe();
 
@@ -191,26 +219,15 @@ export default function App() {
     };
   }, []);
 
-  const syncStateToDatabases = async (table, item, isDelete = false) => {
-    if (supabase) {
-      try {
-        if (isDelete) {
-          await supabase.from(table).delete().eq('id', item.id);
-        } else {
-          await supabase.from(table).upsert(item);
-        }
-      } catch (e) {}
-    }
-
-    if (db && item) {
-      try {
-        if (isDelete) {
-          await deleteDoc(doc(db, table, item.id));
-        } else {
-          await setDoc(doc(db, table, item.id), item, { merge: true });
-        }
-      } catch (e) {}
-    }
+  const syncToSupabase = async (table, item, isDelete = false) => {
+    if (!supabase) return;
+    try {
+      if (isDelete) {
+        await supabase.from(table).delete().eq('id', item.id);
+      } else {
+        await supabase.from(table).upsert(item);
+      }
+    } catch (e) {}
   };
 
   const broadcastSync = (overrideState = {}) => {
@@ -244,7 +261,7 @@ export default function App() {
     setActivities(updatedActs);
     localStorage.setItem('hub_activities', JSON.stringify(updatedActs));
     broadcastSync({ activities: updatedActs });
-    syncStateToDatabases('activities', newAct);
+    syncToSupabase('activities', newAct);
   };
 
   // State sync wrapper functions for child modules
@@ -252,42 +269,42 @@ export default function App() {
     setMessages(newMessagesList);
     localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
     broadcastSync({ messages: newMessagesList });
-    if (updatedItem) syncStateToDatabases('messages', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('messages', updatedItem, isDelete);
   };
 
   const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
     setTodos(newTodosList);
     localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
     broadcastSync({ todos: newTodosList });
-    if (updatedItem) syncStateToDatabases('todos', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('todos', updatedItem, isDelete);
   };
 
   const handleUpdateChatMessages = async (newChatList, updatedItem = null, isDelete = false) => {
     setChatMessages(newChatList);
     localStorage.setItem('hub_chat', JSON.stringify(newChatList));
     broadcastSync({ chatMessages: newChatList });
-    if (updatedItem) syncStateToDatabases('chatMessages', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('chatMessages', updatedItem, isDelete);
   };
 
   const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
     setEvents(newEventsList);
     localStorage.setItem('hub_events', JSON.stringify(newEventsList));
     broadcastSync({ events: newEventsList });
-    if (updatedItem) syncStateToDatabases('events', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('events', updatedItem, isDelete);
   };
 
   const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
     setFiles(newFilesList);
     localStorage.setItem('hub_files', JSON.stringify(newFilesList));
     broadcastSync({ files: newFilesList });
-    if (updatedItem) syncStateToDatabases('files', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('files', updatedItem, isDelete);
   };
 
   const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
     setCheckins(newCheckinsList);
     localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
     broadcastSync({ checkins: newCheckinsList });
-    if (updatedItem) syncStateToDatabases('checkins', updatedItem, isDelete);
+    if (updatedItem) syncToSupabase('checkins', updatedItem, isDelete);
   };
 
   // Sync theme with HTML root attribute & Check for Invite Link in URL
@@ -335,7 +352,7 @@ export default function App() {
         setProjects(updatedProjects);
         setActiveProject(finalProj);
         broadcastSync({ projects: updatedProjects });
-        syncStateToDatabases('projects', finalProj);
+        syncToSupabase('projects', finalProj);
       }
     }
   }, [isDarkMode, currentUser]);
@@ -371,7 +388,7 @@ export default function App() {
     setShowNewProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
-    syncStateToDatabases('projects', newProject);
+    syncToSupabase('projects', newProject);
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
@@ -404,7 +421,7 @@ export default function App() {
     setShowEditProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
-    syncStateToDatabases('projects', updatedData);
+    syncToSupabase('projects', updatedData);
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
@@ -421,7 +438,7 @@ export default function App() {
     setShowDeleteConfirmModal(false);
 
     broadcastSync({ projects: remaining });
-    syncStateToDatabases('projects', activeProject, true);
+    syncToSupabase('projects', activeProject, true);
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
@@ -433,7 +450,7 @@ export default function App() {
     setActiveProject(updatedProj);
 
     broadcastSync({ projects: updatedProjects });
-    syncStateToDatabases('projects', updatedProj);
+    syncToSupabase('projects', updatedProj);
   };
 
   const handleSelectProjectFromGlobal = (projId) => {
