@@ -133,7 +133,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--g-green)', fontWeight: 600 }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-green)', display: 'inline-block' }} />
-          3 Anggota Online
+          {activeProject?.members?.length || 1} Anggota Tim Terhubung
         </div>
       </div>
 

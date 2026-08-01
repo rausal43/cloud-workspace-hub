@@ -68,8 +68,12 @@ export default function App() {
     if (!lastTime) return 0;
     const projItems = items.filter(i => !i.projectId || i.projectId === activeProject?.id);
     return projItems.filter(i => {
-      const itemTime = i.createdAt || (i.id ? parseInt(i.id.split('-')[1]) || 0 : 0);
-      return itemTime > lastTime;
+      let itemTime = i.createdAt;
+      if (!itemTime && i.id) {
+        const digits = String(i.id).replace(/\D/g, '');
+        itemTime = digits ? parseInt(digits.slice(-13)) || 0 : 0;
+      }
+      return (itemTime || 0) > lastTime;
     }).length;
   };
 
