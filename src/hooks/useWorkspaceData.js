@@ -11,6 +11,21 @@ import {
 import { supabase } from '../supabase';
 import * as dbService from '../services/supabaseService';
 
+export function isMatchProject(itemProjectId, activeProject, allProjects = []) {
+  if (!itemProjectId) return true;
+  if (!activeProject) return true;
+  if (itemProjectId === activeProject.id) return true;
+  
+  // Match by project name fallback if IDs differ between clients
+  if (activeProject.name) {
+    const itemProj = allProjects.find(p => p.id === itemProjectId);
+    if (itemProj && itemProj.name && itemProj.name.toLowerCase() === activeProject.name.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useWorkspaceData(currentUser) {
   // State initialization with LocalStorage fallbacks
   const [projects, setProjects] = useState(() => {
@@ -48,7 +63,7 @@ export function useWorkspaceData(currentUser) {
     return saved ? JSON.parse(saved) : INITIAL_CHECKINS;
   });
 
-  // 1. Fetch & Realtime Sync from Supabase PostgreSQL (safely checking array length to prevent wiping local storage)
+  // 1. Fetch & Realtime Sync from Supabase PostgreSQL
   useEffect(() => {
     if (!supabase) return;
 
@@ -59,7 +74,9 @@ export function useWorkspaceData(currentUser) {
         localStorage.setItem('hub_projects', JSON.stringify(projData));
         setActiveProject(prev => {
           if (!prev) return projData[0];
-          return projData.find(p => p.id === prev.id) || projData[0];
+          return projData.find(p => p.id === prev.id) || 
+                 projData.find(p => p.name?.toLowerCase() === prev.name?.toLowerCase()) || 
+                 projData[0];
         });
       }
 
@@ -159,7 +176,7 @@ export function useWorkspaceData(currentUser) {
     } catch (e) {}
   };
 
-  // Helper Mutation Wrappers (Atomic Local & Supabase Sync)
+  // Helper Mutation Wrappers
   const handleAddActivity = async (actionText) => {
     const newAct = {
       id: `act-${Date.now()}`,

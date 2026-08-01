@@ -17,7 +17,13 @@ export default function TodoList({ todos, setTodos, activeProject, currentUser, 
   const [taskAssignee, setTaskAssignee] = useState(defaultAssignee);
   const [taskDueDate, setTaskDueDate] = useState('');
 
-  const filteredTodos = todos.filter(cat => !cat.projectId || cat.projectId === activeProject?.id);
+  const isMatchProject = (projId) => {
+    if (!projId || !activeProject) return true;
+    if (projId === activeProject.id) return true;
+    return false;
+  };
+
+  const filteredTodos = todos.filter(cat => isMatchProject(cat.projectId));
 
   const handleToggleItem = (catId, itemId, e) => {
     if (e) e.stopPropagation();
