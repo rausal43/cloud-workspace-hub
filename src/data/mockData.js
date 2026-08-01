@@ -3,7 +3,7 @@
 export const INITIAL_PROJECTS = [
   {
     id: 'proj-1',
-    name: 'Proyek Utama',
+    name: 'Beon',
     description: 'Ruang kerja utama untuk mengelola tugas, diskusi, dan berkas tim.',
     category: 'General',
     color: '#1a73e8',

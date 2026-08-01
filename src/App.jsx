@@ -124,6 +124,13 @@ export default function App() {
   useEffect(() => {
     if (!db) return;
 
+    // Seed active projects to Firestore Cloud on start
+    projects.forEach(async (p) => {
+      try {
+        await setDoc(doc(db, 'projects', p.id), p, { merge: true });
+      } catch (e) {}
+    });
+
     // 1. Projects Realtime Listener
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       if (!snapshot.empty) {
@@ -133,7 +140,6 @@ export default function App() {
 
         setActiveProject(prev => {
           if (!prev) return cloudProj[0];
-          // Check if user has an invited or matching project in cloud
           const updated = cloudProj.find(p => p.id === prev.id);
           return updated || cloudProj[0];
         });
@@ -328,11 +334,10 @@ export default function App() {
 
     if (inviteProjId) {
       const processInviteLink = async () => {
-        // Try finding locally first
-        let targetProj = projects.find(p => p.id === inviteProjId);
+        let targetProj = null;
 
-        // If not found locally, fetch directly from Firestore Cloud!
-        if (!targetProj && db) {
+        // Fetch directly from Cloud Firestore FIRST to get real updated project (e.g. 'Beon')
+        if (db) {
           try {
             const docSnap = await getDoc(doc(db, 'projects', inviteProjId));
             if (docSnap.exists()) {
@@ -341,14 +346,18 @@ export default function App() {
           } catch (e) {}
         }
 
+        if (!targetProj) {
+          targetProj = projects.find(p => p.id === inviteProjId);
+        }
+
         if (targetProj) {
-          // Add target project to projects array if missing
+          // Add target project to projects array or update existing
           setProjects(prev => {
             const exists = prev.some(p => p.id === targetProj.id);
             return exists ? prev.map(p => p.id === targetProj.id ? targetProj : p) : [targetProj, ...prev];
           });
 
-          // Switch Active Project directly to the invited project!
+          // Switch Active Project directly to targetProj!
           setActiveProject(targetProj);
 
           // Update member status to 'joined'
