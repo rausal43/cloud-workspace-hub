@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Settings } from 'lucide-react';
+import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink } from 'lucide-react';
 import RoleManagerModal from './RoleManagerModal';
 
 export default function TeamManagerModal({ 
@@ -8,7 +8,8 @@ export default function TeamManagerModal({
   activeProject, 
   onUpdateProjectMembers,
   availableRoles,
-  setAvailableRoles
+  setAvailableRoles,
+  onAddActivity
 }) {
   const [activeTab, setActiveTab] = useState('list'); // 'list' | 'invite'
   const [showRoleManager, setShowRoleManager] = useState(false);
@@ -18,6 +19,7 @@ export default function TeamManagerModal({
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState(availableRoles[0]?.name || 'Developer');
   const [inviteSuccessMsg, setInviteSuccessMsg] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Edit member role state
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
@@ -26,12 +28,21 @@ export default function TeamManagerModal({
   if (!isOpen || !activeProject) return null;
 
   const members = activeProject.members || [];
+  const selectedRoleName = inviteRole || (availableRoles[0] ? availableRoles[0].name : 'Developer');
+
+  // Generate Real Join / Access Link
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://project-management-388.pages.dev';
+  const inviteLink = `${currentOrigin}/?invite=${encodeURIComponent(activeProject.id)}&role=${encodeURIComponent(selectedRoleName)}&email=${encodeURIComponent(inviteEmail || 'user')}`;
+
+  const handleCopyInviteLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleSendGmailInvite = (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
-
-    const selectedRoleName = inviteRole || (availableRoles[0] ? availableRoles[0].name : 'Developer');
 
     const newMember = {
       name: inviteName.trim() || inviteEmail.split('@')[0],
@@ -43,14 +54,28 @@ export default function TeamManagerModal({
     const updatedMembers = [...members, newMember];
     onUpdateProjectMembers(updatedMembers);
 
-    setInviteSuccessMsg(`Undangan berhasil dikirim ke ${inviteEmail}!`);
+    // Record Real Activity
+    if (onAddActivity) {
+      onAddActivity(`Mengundang ${newMember.name} (${newMember.email}) sebagai ${selectedRoleName}`);
+    }
+
+    // Open Real Gmail Web Composer with prefilled email & invite link
+    const subject = encodeURIComponent(`Undangan Bergabung ke Proyek: ${activeProject.name}`);
+    const bodyText = encodeURIComponent(
+      `Halo,\n\nAnda diundang untuk bergabung ke dalam proyek "${activeProject.name}" sebagai ${selectedRoleName}.\n\nKlik link di bawah ini untuk mengakses ruang kerja proyek:\n${inviteLink}\n\nSalam,\nTim ${activeProject.name}`
+    );
+    
+    const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inviteEmail.trim())}&su=${subject}&body=${bodyText}`;
+    window.open(gmailWebUrl, '_blank');
+
+    setInviteSuccessMsg(`Undangan ditambahkan! Gmail composer telah dibuka untuk mengirikan email ke ${inviteEmail}.`);
     setInviteEmail('');
     setInviteName('');
     
     setTimeout(() => {
       setInviteSuccessMsg('');
       setActiveTab('list');
-    }, 1500);
+    }, 2500);
   };
 
   const handleRemoveMember = (index) => {
@@ -58,8 +83,12 @@ export default function TeamManagerModal({
       alert('Proyek minimal harus memiliki 1 anggota tim.');
       return;
     }
+    const removed = members[index];
     const updatedMembers = members.filter((_, i) => i !== index);
     onUpdateProjectMembers(updatedMembers);
+    if (onAddActivity && removed) {
+      onAddActivity(`Menghapus ${removed.name} dari tim proyek`);
+    }
   };
 
   const handleSaveRole = (index) => {
@@ -70,6 +99,9 @@ export default function TeamManagerModal({
       return m;
     });
     onUpdateProjectMembers(updatedMembers);
+    if (onAddActivity && members[index]) {
+      onAddActivity(`Mengubah peran ${members[index].name} menjadi ${editedRole}`);
+    }
     setEditingMemberIndex(null);
   };
 
@@ -223,7 +255,7 @@ export default function TeamManagerModal({
           </div>
         )}
 
-        {/* Tab 2: Invite via Gmail Form */}
+        {/* Tab 2: Invite via Gmail Form & Real Link Generator */}
         {activeTab === 'invite' && (
           <form onSubmit={handleSendGmailInvite}>
             <div style={{ marginBottom: '14px' }}>
@@ -257,7 +289,7 @@ export default function TeamManagerModal({
               />
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 700 }}>
                   Peran dalam Proyek (Role & Hak Akses)
@@ -278,6 +310,23 @@ export default function TeamManagerModal({
               </select>
             </div>
 
+            {/* Direct Join Link Preview & Copy */}
+            <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>LINK AKSES / UNDANGAN LANGSUNG</span>
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  style={{ background: 'none', border: 'none', color: 'var(--g-blue)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Copy size={12} /> {copiedLink ? '✓ Tersalin!' : 'Salin Link'}
+                </button>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                {inviteLink}
+              </div>
+            </div>
+
             {inviteSuccessMsg && (
               <div style={{ color: 'var(--g-green)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Check size={16} /> {inviteSuccessMsg}
@@ -289,7 +338,7 @@ export default function TeamManagerModal({
                 Kembali ke Daftar Tim
               </button>
               <button type="submit" className="btn btn-primary">
-                <Send size={16} /> Kirim Undangan Gmail
+                <Send size={16} /> Kirim via Gmail Web
               </button>
             </div>
           </form>

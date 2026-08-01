@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CheckSquare, Plus, Calendar, User, LayoutGrid, List, CheckCircle2, Circle, Edit3, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function TodoList({ todos, setTodos, activeProject }) {
+export default function TodoList({ todos, setTodos, activeProject, notify }) {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -28,6 +28,9 @@ export default function TodoList({ todos, setTodos, activeProject }) {
                 spread: 60,
                 origin: { y: 0.7 }
               });
+              notify?.(`Tugas "${item.text}" selesai 🎉`, 'success');
+            } else {
+              notify?.(`Status tugas "${item.text}" diperbarui`, 'info');
             }
             return { ...item, completed: willBeCompleted };
           }
@@ -61,6 +64,7 @@ export default function TodoList({ todos, setTodos, activeProject }) {
     setTaskText('');
     setTaskDueDate('');
     setActiveCategoryId(null);
+    notify?.(`Tugas "${newItem.text}" berhasil dibuat`, 'success');
   };
 
   const handleOpenEditTask = (catId, item, e) => {
@@ -98,6 +102,7 @@ export default function TodoList({ todos, setTodos, activeProject }) {
     setEditingTask(null);
     setTaskText('');
     setTaskDueDate('');
+    notify?.(`Tugas "${taskText}" diperbarui`, 'info');
   };
 
   const handleDeleteTask = (catId, itemId, e) => {
@@ -111,10 +116,12 @@ export default function TodoList({ todos, setTodos, activeProject }) {
       }
       return cat;
     }));
+    notify?.('Tugas berhasil dihapus', 'delete');
   };
 
   const handleDeleteCategory = (catId) => {
     setTodos(todos.filter(c => c.id !== catId));
+    notify?.('Grup tugas berhasil dihapus', 'delete');
   };
 
   const handleAddCategory = (e) => {

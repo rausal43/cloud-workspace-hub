@@ -31,8 +31,13 @@ export default function LoginModal({ isOpen, onClose, currentUser, setCurrentUse
         }, 1200);
       } catch (err) {
         console.error("Google Sign-In Error:", err);
-        alert("Gagal Google Sign-In. Memakai simulasi login Google.");
-        simulateLogin();
+        if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
+          alert("⚠️ Provider Google belum diaktifkan di Firebase Console.\n\nSilakan buka Firebase Console -> Authentication -> Sign-in method -> Tambahkan Provider Google & Aktifkan.");
+        } else if (err.code === 'auth/unauthorized-domain') {
+          alert("⚠️ Domain ini belum diizinkan di Firebase Console.\n\nSilakan buka Firebase Console -> Authentication -> Settings -> Authorized Domains -> Tambahkan domain project-management-388.pages.dev");
+        } else {
+          alert(`Google Sign-In Error (${err.code || 'unknown'}): ${err.message}`);
+        }
       }
     } else {
       simulateLogin();

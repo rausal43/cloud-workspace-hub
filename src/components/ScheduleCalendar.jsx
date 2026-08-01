@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Calendar as CalendarIcon, Plus, Clock, MapPin, CheckCircle, Edit3, Trash2, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function ScheduleCalendar({ events, setEvents, activeProject }) {
+export default function ScheduleCalendar({ events, setEvents, activeProject, notify }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -34,6 +34,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject }) {
           try {
             confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
           } catch (err) {}
+          notify?.(`Acara "${evt.title}" ditandai selesai 🎉`, 'success');
+        } else {
+          notify?.(`Status acara "${evt.title}" diperbarui`, 'info');
         }
         return { ...evt, completed: nextState };
       }
@@ -64,6 +67,7 @@ export default function ScheduleCalendar({ events, setEvents, activeProject }) {
     setDate('');
     setColor('#1a73e8');
     setShowAddModal(false);
+    notify?.(`Acara "${newEvent.title}" ditambahkan ke kalender!`, 'success');
   };
 
   const handleOpenEditEvent = (evt) => {
@@ -98,10 +102,12 @@ export default function ScheduleCalendar({ events, setEvents, activeProject }) {
     setEditingEvent(null);
     setTitle('');
     setDate('');
+    notify?.(`Acara "${title}" berhasil diperbarui`, 'info');
   };
 
   const handleDeleteEvent = (evtId) => {
     setEvents(events.filter(e => e.id !== evtId));
+    notify?.('Acara berhasil dihapus dari kalender', 'delete');
   };
 
   // Filter events based on hideCompleted

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { MessageSquare, Pin, Plus, Search, MessageCircle, User, Calendar, Tag, Edit3, Trash2, Settings, Check } from 'lucide-react';
+import { useLocalStorageState } from '../hooks/useLocalStorage';
 
-export default function MessageBoard({ messages, setMessages, activeProject }) {
-  const [categories, setCategories] = useState(['Pengumuman', 'Desain', 'Teknis', 'Pitch']);
+export default function MessageBoard({ messages, setMessages, activeProject, notify }) {
+  const [categories, setCategories] = useLocalStorageState('gcloud_message_categories', ['Pengumuman', 'Desain', 'Teknis', 'Pitch']);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -54,6 +55,7 @@ export default function MessageBoard({ messages, setMessages, activeProject }) {
     setTitle('');
     setContent('');
     setShowCreateModal(false);
+    notify?.(`Diskusi "${newMsg.title}" berhasil diterbitkan!`, 'success');
   };
 
   const handleOpenEditModal = (msg, e) => {
@@ -93,6 +95,7 @@ export default function MessageBoard({ messages, setMessages, activeProject }) {
     setEditingMessage(null);
     setTitle('');
     setContent('');
+    notify?.(`Diskusi "${title}" berhasil diperbarui`, 'info');
   };
 
   const handleDeletePost = (msgId, e) => {
@@ -101,6 +104,7 @@ export default function MessageBoard({ messages, setMessages, activeProject }) {
     if (activeMessageDetail && activeMessageDetail.id === msgId) {
       setActiveMessageDetail(null);
     }
+    notify?.('Diskusi berhasil dihapus', 'delete');
   };
 
   const handleAddCategory = (e) => {
@@ -108,6 +112,7 @@ export default function MessageBoard({ messages, setMessages, activeProject }) {
     if (!newCatName.trim()) return;
     if (!categories.includes(newCatName.trim())) {
       setCategories([...categories, newCatName.trim()]);
+      notify?.(`Kategori "${newCatName.trim()}" ditambahkan`, 'success');
     }
     setNewCatName('');
   };

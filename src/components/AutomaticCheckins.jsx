@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { HelpCircle, Plus, Send, Clock, User, CheckCircle2 } from 'lucide-react';
 
-export default function AutomaticCheckins({ checkins, setCheckins, activeProject }) {
+export default function AutomaticCheckins({ checkins, setCheckins, activeProject, notify }) {
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSchedule, setNewSchedule] = useState('Setiap hari kerja jam 16:30');
@@ -24,6 +24,7 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
     setCheckins([newChk, ...checkins]);
     setNewQuestion('');
     setShowAddQuestionModal(false);
+    notify?.('Pertanyaan standup otomatis berhasil ditambahkan!', 'success');
   };
 
   const handleSubmitAnswer = (chkId) => {
@@ -48,6 +49,7 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
 
     setAnswerInput('');
     setActiveQuestionId(null);
+    notify?.('Jawaban standup berhasil dikirim!', 'info');
   };
 
   return (

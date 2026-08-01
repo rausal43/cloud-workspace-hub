@@ -21,7 +21,8 @@ export default function ProjectDashboard({
   events,
   files,
   checkins,
-  onOpenTeamModal
+  onOpenTeamModal,
+  activities = []
 }) {
   if (!activeProject) return null;
 
@@ -244,23 +245,27 @@ export default function ProjectDashboard({
         </div>
       </div>
 
-      {/* Activity Log Feed */}
+      {/* Dynamic Real Activity Feed */}
       <div className="glass-card" style={{ padding: '20px' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Activity color="var(--g-blue)" size={18} /> Aktivitas Terbaru Proyek
         </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-blue)', flexShrink: 0 }} />
-            <span><strong>Rian Hidayat</strong> menyelesaikan tugas <em>Konfigurasi Firebase App & Auth</em></span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>1 jam lalu</span>
+
+        {activities.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
+            {activities.map(act => (
+              <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-blue)', flexShrink: 0 }} />
+                <span><strong>{act.user}</strong> {act.action}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{act.time}</span>
+              </div>
+            ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-yellow)', flexShrink: 0 }} />
-            <span><strong>Budi Santoso</strong> menambahkan dokumen <em>Roadmap_Proyek_Q3.gsheet</em> ke Google Drive</span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>2 jam lalu</span>
+        ) : (
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Belum ada aktivitas terbaru dalam proyek ini.
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

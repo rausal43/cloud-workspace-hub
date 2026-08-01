@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, Paperclip, Smile, Hash, Users, Sparkles, Plus, Edit3, Trash2 } from 'lucide-react';
+import { useLocalStorageState } from '../hooks/useLocalStorage';
 
-export default function CampfireChat({ chatMessages, setChatMessages, activeProject }) {
-  const [channels, setChannels] = useState([
-    { id: 'general', name: 'general', desc: 'Obrolan umum & koordinasi tim' },
-    { id: 'dev-talk', name: 'dev-talk', desc: 'Diskusi Google Cloud, Firestore API & Code' },
-    { id: 'design', name: 'design-system', desc: 'Wireframe, UI/UX & Feedback visual' }
-  ]);
+const INITIAL_CHANNELS = [
+  { id: 'general', name: 'general', desc: 'Obrolan umum & koordinasi tim' },
+  { id: 'dev-talk', name: 'dev-talk', desc: 'Diskusi Google Cloud, Firestore API & Code' },
+  { id: 'design', name: 'design-system', desc: 'Wireframe, UI/UX & Feedback visual' }
+];
+
+export default function CampfireChat({ chatMessages, setChatMessages, activeProject, notify }) {
+  const [channels, setChannels] = useLocalStorageState('gcloud_chat_channels', INITIAL_CHANNELS);
   const [activeChannel, setActiveChannel] = useState('general');
   const [textInput, setTextInput] = useState('');
   const chatBottomRef = useRef(null);
@@ -36,6 +39,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
 
     setChatMessages([...chatMessages, newMsg]);
     setTextInput('');
+    notify?.('Pesan terkirim ke obrolan', 'info');
   };
 
   const handleAddChannel = (e) => {
@@ -54,6 +58,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     setChannelNameInput('');
     setChannelDescInput('');
     setShowAddChannelModal(false);
+    notify?.(`Saluran #${formattedName} berhasil dibuat!`, 'success');
   };
 
   const handleOpenEditChannel = (ch, e) => {
@@ -87,12 +92,13 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     setEditingChannel(null);
     setChannelNameInput('');
     setChannelDescInput('');
+    notify?.(`Saluran #${formattedName} berhasil diperbarui`, 'info');
   };
 
   const handleDeleteChannel = (chId, chName, e) => {
     if (e) e.stopPropagation();
     if (channels.length <= 1) {
-      alert('Minimal harus ada 1 saluran chat.');
+      notify?.('Minimal harus ada 1 saluran chat.', 'warning');
       return;
     }
 
@@ -101,6 +107,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     if (activeChannel === chName) {
       setActiveChannel(remaining[0].name);
     }
+    notify?.(`Saluran #${chName} berhasil dihapus!`, 'delete');
   };
 
   const currentChannelObj = channels.find(c => c.name === activeChannel) || channels[0];

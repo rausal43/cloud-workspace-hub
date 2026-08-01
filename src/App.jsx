@@ -42,6 +42,9 @@ export default function App() {
   // Available Roles & Access Control State
   const [availableRoles, setAvailableRoles] = useState(INITIAL_ROLES);
 
+  // Dynamic Real Activities Feed State
+  const [activities, setActivities] = useState([]);
+
   // User & Auth State
   const [currentUser, setCurrentUser] = useState({
     id: 'usr-1',
@@ -74,9 +77,47 @@ export default function App() {
   const [projCat, setProjCat] = useState('Productivity');
   const [projColor, setProjColor] = useState('#1a73e8');
 
-  // Sync theme with HTML root attribute
+  // Helper to add real activity log
+  const handleAddActivity = (actionText) => {
+    const newAct = {
+      id: `act-${Date.now()}`,
+      user: currentUser ? currentUser.name : 'Pengguna',
+      action: actionText,
+      time: 'Baru saja'
+    };
+    setActivities(prev => [newAct, ...prev]);
+  };
+
+  // Sync theme with HTML root attribute & Check for Invite Link in URL
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+
+    // Auto-detect Invitation Join Link
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteProjId = urlParams.get('invite');
+    const inviteRoleName = urlParams.get('role') || 'Developer';
+    const inviteEmail = urlParams.get('email');
+
+    if (inviteProjId) {
+      const targetProj = projects.find(p => p.id === inviteProjId) || projects[0];
+      if (targetProj) {
+        setActiveProject(targetProj);
+        // Check if member already in project
+        const memberEmail = currentUser ? currentUser.email : (inviteEmail || 'guest@gmail.com');
+        const exists = (targetProj.members || []).some(m => m.email === memberEmail);
+        if (!exists) {
+          const newMember = {
+            name: currentUser ? currentUser.name : 'Anggota Undangan',
+            email: memberEmail,
+            avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            role: inviteRoleName
+          };
+          const updatedMembers = [...(targetProj.members || []), newMember];
+          handleUpdateProjectMembers(updatedMembers);
+          handleAddActivity(`bergabung ke dalam tim proyek via link undangan`);
+        }
+      }
+    }
   }, [isDarkMode]);
 
   const handleCreateProject = (e) => {
@@ -100,6 +141,7 @@ export default function App() {
     setProjName('');
     setProjDesc('');
     setShowNewProjectModal(false);
+    handleAddActivity(`membuat proyek baru: ${newProject.name}`);
   };
 
   const handleOpenEditProject = () => {
@@ -139,6 +181,7 @@ export default function App() {
       updatedAt: 'Baru saja diperbarui'
     });
     setShowEditProjectModal(false);
+    handleAddActivity(`memperbarui informasi proyek`);
   };
 
   const handleDeleteProject = () => {
@@ -270,6 +313,7 @@ export default function App() {
                   files={files}
                   checkins={checkins}
                   onOpenTeamModal={() => setShowTeamModal(true)}
+                  activities={activities}
                 />
               )}
 
@@ -278,6 +322,7 @@ export default function App() {
                   messages={messages}
                   setMessages={setMessages}
                   activeProject={activeProject}
+                  onAddActivity={handleAddActivity}
                 />
               )}
 
@@ -286,6 +331,7 @@ export default function App() {
                   todos={todos}
                   setTodos={setTodos}
                   activeProject={activeProject}
+                  onAddActivity={handleAddActivity}
                 />
               )}
 
@@ -302,6 +348,7 @@ export default function App() {
                   events={events}
                   setEvents={setEvents}
                   activeProject={activeProject}
+                  onAddActivity={handleAddActivity}
                 />
               )}
 
@@ -310,6 +357,7 @@ export default function App() {
                   files={files}
                   setFiles={setFiles}
                   activeProject={activeProject}
+                  onAddActivity={handleAddActivity}
                 />
               )}
 
@@ -349,6 +397,7 @@ export default function App() {
         onUpdateProjectMembers={handleUpdateProjectMembers}
         availableRoles={availableRoles}
         setAvailableRoles={setAvailableRoles}
+        onAddActivity={handleAddActivity}
       />
 
       {/* Settings Modal */}

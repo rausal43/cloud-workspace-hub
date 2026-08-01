@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2 } from 'lucide-react';
 
-export default function DocsAndFiles({ files, setFiles, activeProject }) {
+export default function DocsAndFiles({ files, setFiles, activeProject, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [fileSource, setFileSource] = useState('Google Drive');
   const [previewFile, setPreviewFile] = useState(null);
@@ -70,11 +70,13 @@ export default function DocsAndFiles({ files, setFiles, activeProject }) {
     setSelectedLocalFile(null);
     setCustomFileName('');
     setShowUploadModal(false);
+    notify?.(`Berkas "${fileNameToUse}" berhasil diunggah!`, 'success');
   };
 
   const handleDeleteFile = (fileId) => {
     setFiles(files.filter(f => f.id !== fileId));
     if (previewFile?.id === fileId) setPreviewFile(null);
+    notify?.('Berkas berhasil dihapus', 'delete');
   };
 
   return (
