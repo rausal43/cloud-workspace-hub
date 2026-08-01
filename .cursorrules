@@ -1,0 +1,5 @@
+# AI AGENT CODING RULES
+- Rule 1: Always enforce 1 module per file (1 code = 1 module).
+- Rule 2: Maximum limit per file is 300 lines of code.
+- Rule 3: Keep services in `src/services/`, custom hooks in `src/hooks/`, and UI components in `src/components/`.
+- Rule 4: All API keys and secrets MUST be read from `.env` environment variables ONLY.

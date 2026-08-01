@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
+import NavigationSubTabs from './components/NavigationSubTabs';
 import ProjectDashboard from './components/ProjectDashboard';
 import MessageBoard from './components/MessageBoard';
 import TodoList from './components/TodoList';
@@ -10,20 +11,11 @@ import AutomaticCheckins from './components/AutomaticCheckins';
 import GlobalDashboard from './components/GlobalDashboard';
 import LoginModal from './components/LoginModal';
 import TeamManagerModal from './components/TeamManagerModal';
+import { NewProjectModal, EditProjectModal, DeleteProjectModal } from './components/ProjectModals';
 
-import { 
-  INITIAL_PROJECTS, 
-  INITIAL_MESSAGES, 
-  INITIAL_TODOS, 
-  INITIAL_CHAT_MESSAGES, 
-  INITIAL_FILES, 
-  INITIAL_EVENTS, 
-  INITIAL_CHECKINS
-} from './data/mockData';
-
-import { supabase } from './supabase';
-
-import { LayoutDashboard, MessageSquare, CheckSquare, MessageCircle, Calendar, HardDrive, HelpCircle, Plus, Edit3, Trash2, Globe } from 'lucide-react';
+import { useWorkspaceData } from './hooks/useWorkspaceData';
+import * as dbService from './services/supabaseService';
+import { Plus } from 'lucide-react';
 
 const INITIAL_ROLES = [
   { id: 'role-lead', name: 'Project Lead', level: 'Admin', canEdit: true, canDelete: true, canInvite: true, canManageProject: true, color: '#1a73e8' },
@@ -35,66 +27,31 @@ const INITIAL_ROLES = [
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
   // User & Auth State
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('hub_currentUser');
-    if (savedUser) {
-      try { return JSON.parse(savedUser); } catch (e) {}
-    }
+    if (savedUser) { try { return JSON.parse(savedUser); } catch (e) {} }
     return null;
   });
 
-  // Projects State
-  const [projects, setProjects] = useState(() => {
-    const saved = localStorage.getItem('hub_projects');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-  });
+  // Custom Hook for Supabase Workspace Data
+  const {
+    projects, setProjects,
+    activeProject, setActiveProject,
+    activities, handleAddActivity,
+    messages, handleUpdateMessages,
+    todos, handleUpdateTodos,
+    chatMessages, handleUpdateChatMessages,
+    files, handleUpdateFiles,
+    events, handleUpdateEvents,
+    checkins, handleUpdateCheckins,
+    broadcastSync
+  } = useWorkspaceData(currentUser);
 
-  const [activeProject, setActiveProject] = useState(() => projects[0] || INITIAL_PROJECTS[0]);
-  const [activeTab, setActiveTab] = useState('overview');
-
-  // Available Roles State
+  // Available Roles & Modals state
   const [availableRoles, setAvailableRoles] = useState(INITIAL_ROLES);
-
-  // Dynamic Real Activities Feed State
-  const [activities, setActivities] = useState(() => {
-    const saved = localStorage.getItem('hub_activities');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Module States
-  const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('hub_messages');
-    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
-  });
-
-  const [todos, setTodos] = useState(() => {
-    const saved = localStorage.getItem('hub_todos');
-    return saved ? JSON.parse(saved) : INITIAL_TODOS;
-  });
-
-  const [chatMessages, setChatMessages] = useState(() => {
-    const saved = localStorage.getItem('hub_chat');
-    return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
-  });
-
-  const [files, setFiles] = useState(() => {
-    const saved = localStorage.getItem('hub_files');
-    return saved ? JSON.parse(saved) : INITIAL_FILES;
-  });
-
-  const [events, setEvents] = useState(() => {
-    const saved = localStorage.getItem('hub_events');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-  });
-
-  const [checkins, setCheckins] = useState(() => {
-    const saved = localStorage.getItem('hub_checkins');
-    return saved ? JSON.parse(saved) : INITIAL_CHECKINS;
-  });
-
-  // Modals state
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
@@ -107,211 +64,10 @@ export default function App() {
   const [projCat, setProjCat] = useState('Productivity');
   const [projColor, setProjColor] = useState('#1a73e8');
 
-  // Always Sync currentUser to LocalStorage
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('hub_currentUser');
-    }
-  }, [currentUser]);
-
-  // =========================================================
-  // ⚡ SUPABASE POSTGRESQL REALTIME SYNC ENGINE (SOLE DATABASE)
-  // =========================================================
-  useEffect(() => {
-    if (!supabase) return;
-
-    const fetchAllSupabaseTables = async () => {
-      try {
-        const { data: projData } = await supabase.from('projects').select('*');
-        if (projData && projData.length > 0) {
-          setProjects(projData);
-          localStorage.setItem('hub_projects', JSON.stringify(projData));
-          setActiveProject(prev => {
-            if (!prev) return projData[0];
-            const found = projData.find(p => p.id === prev.id);
-            return found || projData[0];
-          });
-        }
-
-        const { data: msgData } = await supabase.from('messages').select('*');
-        if (msgData) {
-          setMessages(msgData);
-          localStorage.setItem('hub_messages', JSON.stringify(msgData));
-        }
-
-        const { data: todoData } = await supabase.from('todos').select('*');
-        if (todoData) {
-          setTodos(todoData);
-          localStorage.setItem('hub_todos', JSON.stringify(todoData));
-        }
-
-        const { data: chatData } = await supabase.from('chatMessages').select('*');
-        if (chatData) {
-          setChatMessages(chatData);
-          localStorage.setItem('hub_chat', JSON.stringify(chatData));
-        }
-
-        const { data: fileData } = await supabase.from('files').select('*');
-        if (fileData) {
-          setFiles(fileData);
-          localStorage.setItem('hub_files', JSON.stringify(fileData));
-        }
-
-        const { data: eventData } = await supabase.from('events').select('*');
-        if (eventData) {
-          setEvents(eventData);
-          localStorage.setItem('hub_events', JSON.stringify(eventData));
-        }
-
-        const { data: checkinData } = await supabase.from('checkins').select('*');
-        if (checkinData) {
-          setCheckins(checkinData);
-          localStorage.setItem('hub_checkins', JSON.stringify(checkinData));
-        }
-
-        const { data: actData } = await supabase.from('activities').select('*');
-        if (actData) {
-          setActivities(actData);
-          localStorage.setItem('hub_activities', JSON.stringify(actData));
-        }
-      } catch (e) {}
-    };
-
-    fetchAllSupabaseTables();
-
-    // Subscribe to Supabase Realtime Channel
-    const channel = supabase.channel('supabase-realtime-all')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        fetchAllSupabaseTables();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // BroadcastChannel for instant same-browser cross-tab sync
-  useEffect(() => {
-    let bc;
-    try {
-      bc = new BroadcastChannel('gcloud_hub_sync');
-      bc.onmessage = (event) => {
-        if (event.data) {
-          const { type, payload } = event.data;
-          if (type === 'SYNC_ALL' && payload) {
-            if (payload.projects) setProjects(payload.projects);
-            if (payload.messages) setMessages(payload.messages);
-            if (payload.todos) setTodos(payload.todos);
-            if (payload.chatMessages) setChatMessages(payload.chatMessages);
-            if (payload.events) setEvents(payload.events);
-            if (payload.files) setFiles(payload.files);
-            if (payload.checkins) setCheckins(payload.checkins);
-            if (payload.activities) setActivities(payload.activities);
-          }
-        }
-      };
-    } catch (e) {}
-    return () => {
-      if (bc) bc.close();
-    };
-  }, []);
-
-  const syncToSupabase = async (table, item, isDelete = false) => {
-    if (!supabase) return;
-    try {
-      if (isDelete) {
-        await supabase.from(table).delete().eq('id', item.id);
-      } else {
-        await supabase.from(table).upsert(item);
-      }
-    } catch (e) {}
-  };
-
-  const broadcastSync = (overrideState = {}) => {
-    const payload = {
-      projects: overrideState.projects || projects,
-      messages: overrideState.messages || messages,
-      todos: overrideState.todos || todos,
-      chatMessages: overrideState.chatMessages || chatMessages,
-      files: overrideState.files || files,
-      events: overrideState.events || events,
-      checkins: overrideState.checkins || checkins,
-      activities: overrideState.activities || activities
-    };
-    try {
-      const bc = new BroadcastChannel('gcloud_hub_sync');
-      bc.postMessage({ type: 'SYNC_ALL', payload });
-      bc.close();
-    } catch (e) {}
-  };
-
-  // Helper to add real activity log
-  const handleAddActivity = async (actionText) => {
-    const newAct = {
-      id: `act-${Date.now()}`,
-      user: currentUser ? currentUser.name : 'Pengguna',
-      action: actionText,
-      time: 'Baru saja',
-      createdAt: Date.now()
-    };
-    const updatedActs = [newAct, ...activities];
-    setActivities(updatedActs);
-    localStorage.setItem('hub_activities', JSON.stringify(updatedActs));
-    broadcastSync({ activities: updatedActs });
-    syncToSupabase('activities', newAct);
-  };
-
-  // State sync wrapper functions for child modules
-  const handleUpdateMessages = async (newMessagesList, updatedItem = null, isDelete = false) => {
-    setMessages(newMessagesList);
-    localStorage.setItem('hub_messages', JSON.stringify(newMessagesList));
-    broadcastSync({ messages: newMessagesList });
-    if (updatedItem) syncToSupabase('messages', updatedItem, isDelete);
-  };
-
-  const handleUpdateTodos = async (newTodosList, updatedItem = null, isDelete = false) => {
-    setTodos(newTodosList);
-    localStorage.setItem('hub_todos', JSON.stringify(newTodosList));
-    broadcastSync({ todos: newTodosList });
-    if (updatedItem) syncToSupabase('todos', updatedItem, isDelete);
-  };
-
-  const handleUpdateChatMessages = async (newChatList, updatedItem = null, isDelete = false) => {
-    setChatMessages(newChatList);
-    localStorage.setItem('hub_chat', JSON.stringify(newChatList));
-    broadcastSync({ chatMessages: newChatList });
-    if (updatedItem) syncToSupabase('chatMessages', updatedItem, isDelete);
-  };
-
-  const handleUpdateEvents = async (newEventsList, updatedItem = null, isDelete = false) => {
-    setEvents(newEventsList);
-    localStorage.setItem('hub_events', JSON.stringify(newEventsList));
-    broadcastSync({ events: newEventsList });
-    if (updatedItem) syncToSupabase('events', updatedItem, isDelete);
-  };
-
-  const handleUpdateFiles = async (newFilesList, updatedItem = null, isDelete = false) => {
-    setFiles(newFilesList);
-    localStorage.setItem('hub_files', JSON.stringify(newFilesList));
-    broadcastSync({ files: newFilesList });
-    if (updatedItem) syncToSupabase('files', updatedItem, isDelete);
-  };
-
-  const handleUpdateCheckins = async (newCheckinsList, updatedItem = null, isDelete = false) => {
-    setCheckins(newCheckinsList);
-    localStorage.setItem('hub_checkins', JSON.stringify(newCheckinsList));
-    broadcastSync({ checkins: newCheckinsList });
-    if (updatedItem) syncToSupabase('checkins', updatedItem, isDelete);
-  };
-
-  // Sync theme with HTML root attribute & Check for Invite Link in URL
+  // Theme Sync & Auto Join Link Detection
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
 
-    // Auto-detect Invitation Join Link
     const urlParams = new URLSearchParams(window.location.search);
     const inviteProjId = urlParams.get('invite');
     const inviteRoleName = urlParams.get('role') || 'Developer';
@@ -319,24 +75,16 @@ export default function App() {
 
     if (inviteProjId) {
       let targetProj = projects.find(p => p.id === inviteProjId) || projects[0];
-
       if (targetProj) {
         let resolvedEmail = currentUser ? currentUser.email : inviteEmail;
-        if (!resolvedEmail || resolvedEmail === 'user') {
-          resolvedEmail = 'sepedab746@gmail.com';
-        }
+        if (!resolvedEmail || resolvedEmail === 'user') resolvedEmail = 'sepedab746@gmail.com';
 
         const existingMembers = targetProj.members || [];
-        
-        const updatedMembers = existingMembers.map(m => {
-          if (m.email?.toLowerCase() === resolvedEmail?.toLowerCase()) {
-            return { ...m, status: 'joined' };
-          }
-          return m;
-        });
+        const updatedMembers = existingMembers.map(m => 
+          m.email?.toLowerCase() === resolvedEmail?.toLowerCase() ? { ...m, status: 'joined' } : m
+        );
 
-        const hasMember = existingMembers.some(m => m.email?.toLowerCase() === resolvedEmail?.toLowerCase());
-        if (!hasMember) {
+        if (!existingMembers.some(m => m.email?.toLowerCase() === resolvedEmail?.toLowerCase())) {
           updatedMembers.push({
             name: currentUser ? currentUser.name : resolvedEmail.split('@')[0],
             email: resolvedEmail,
@@ -347,12 +95,11 @@ export default function App() {
         }
 
         const finalProj = { ...targetProj, members: updatedMembers };
-
         const updatedProjects = projects.map(p => p.id === finalProj.id ? finalProj : p);
         setProjects(updatedProjects);
         setActiveProject(finalProj);
         broadcastSync({ projects: updatedProjects });
-        syncToSupabase('projects', finalProj);
+        dbService.saveProjectToDb(finalProj);
       }
     }
   }, [isDarkMode, currentUser]);
@@ -361,23 +108,20 @@ export default function App() {
     e.preventDefault();
     if (!projName.trim()) return;
 
-    const newProjId = `proj-${Date.now()}`;
     const newProject = {
-      id: newProjId,
+      id: `proj-${Date.now()}`,
       name: projName,
       description: projDesc || 'Proyek baru berbasis Google Cloud Platform',
       category: projCat,
       color: projColor,
       updatedAt: 'Baru saja',
-      members: [
-        { 
-          name: currentUser?.name || 'Admin', 
-          avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', 
-          role: 'Project Lead', 
-          email: currentUser?.email || 'admin@gmail.com',
-          status: 'joined'
-        }
-      ]
+      members: [{ 
+        name: currentUser?.name || 'Admin', 
+        avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', 
+        role: 'Project Lead', 
+        email: currentUser?.email || 'admin@gmail.com',
+        status: 'joined'
+      }]
     };
 
     const updatedProjects = [newProject, ...projects];
@@ -388,17 +132,8 @@ export default function App() {
     setShowNewProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
-    syncToSupabase('projects', newProject);
+    dbService.saveProjectToDb(newProject);
     handleAddActivity(`membuat proyek baru: ${newProject.name}`);
-  };
-
-  const handleOpenEditProject = () => {
-    if (!activeProject) return;
-    setProjName(activeProject.name);
-    setProjDesc(activeProject.description);
-    setProjCat(activeProject.category);
-    setProjColor(activeProject.color);
-    setShowEditProjectModal(true);
   };
 
   const handleSaveEditProject = async (e) => {
@@ -415,138 +150,76 @@ export default function App() {
     };
 
     const updatedProjects = projects.map(p => p.id === activeProject.id ? updatedData : p);
-
     setProjects(updatedProjects);
     setActiveProject(updatedData);
     setShowEditProjectModal(false);
 
     broadcastSync({ projects: updatedProjects });
-    syncToSupabase('projects', updatedData);
+    dbService.saveProjectToDb(updatedData);
     handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
   const handleDeleteProject = async () => {
     if (!activeProject) return;
-    const deletedId = activeProject.id;
-    const remaining = projects.filter(p => p.id !== deletedId);
+    const deletedProj = activeProject;
+    const remaining = projects.filter(p => p.id !== deletedProj.id);
     setProjects(remaining);
-    if (remaining.length > 0) {
-      setActiveProject(remaining[0]);
-    } else {
-      setActiveProject(null);
-    }
+    setActiveProject(remaining[0] || null);
     setShowDeleteConfirmModal(false);
 
     broadcastSync({ projects: remaining });
-    syncToSupabase('projects', activeProject, true);
+    dbService.saveProjectToDb(deletedProj, true);
   };
 
   const handleUpdateProjectMembers = async (newMembers) => {
     if (!activeProject) return;
     const updatedProj = { ...activeProject, members: newMembers };
     const updatedProjects = projects.map(p => p.id === activeProject.id ? updatedProj : p);
-    
     setProjects(updatedProjects);
     setActiveProject(updatedProj);
 
     broadcastSync({ projects: updatedProjects });
-    syncToSupabase('projects', updatedProj);
+    dbService.saveProjectToDb(updatedProj);
   };
-
-  const handleSelectProjectFromGlobal = (projId) => {
-    const target = projects.find(p => p.id === projId);
-    if (target) {
-      setActiveProject(target);
-      setActiveTab('overview');
-    }
-  };
-
-  const navTabs = [
-    { id: 'global', label: 'Dashboard Master (Semua Proyek)', icon: Globe },
-    { id: 'overview', label: 'Ringkasan Proyek', icon: LayoutDashboard },
-    { id: 'messages', label: 'Diskusi & Pengumuman', icon: MessageSquare },
-    { id: 'todos', label: 'Manajemen Tugas', icon: CheckSquare },
-    { id: 'chat', label: 'Obrolan Tim', icon: MessageCircle },
-    { id: 'schedule', label: 'Kalender', icon: Calendar },
-    { id: 'files', label: 'Google Drive & File', icon: HardDrive },
-    { id: 'standups', label: 'Standup Otomatis', icon: HelpCircle }
-  ];
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Navigation */}
       <Navbar
         projects={projects}
         activeProject={activeProject}
         setActiveProject={setActiveProject}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
-        onNewProject={() => {
-          setProjName('');
-          setProjDesc('');
-          setShowNewProjectModal(true);
+        onNewProject={() => { setProjName(''); setProjDesc(''); setShowNewProjectModal(true); }}
+        onEditProject={() => {
+          setProjName(activeProject?.name || '');
+          setProjDesc(activeProject?.description || '');
+          setProjCat(activeProject?.category || 'Productivity');
+          setProjColor(activeProject?.color || '#1a73e8');
+          setShowEditProjectModal(true);
         }}
-        onEditProject={handleOpenEditProject}
         onDeleteProject={() => setShowDeleteConfirmModal(true)}
         onOpenLoginModal={() => setShowLoginModal(true)}
         onOpenTeamModal={() => setShowTeamModal(true)}
         currentUser={currentUser}
       />
 
-      {/* Main Container */}
       <main style={{ flex: 1, maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '0 24px' }}>
-        {/* Secondary Tab Sub-Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          borderBottom: '1px solid var(--border-color)',
-          paddingTop: '16px',
-          overflowX: 'auto',
-          scrollbarWidth: 'none'
-        }}>
-          {navTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: isActive ? '3px solid var(--g-blue)' : '3px solid transparent',
-                  color: isActive ? 'var(--g-blue)' : 'var(--text-secondary)',
-                  fontWeight: isActive ? 700 : 500,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <Icon size={16} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <NavigationSubTabs activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* Global Master Dashboard Tab */}
         {activeTab === 'global' && (
           <GlobalDashboard
             projects={projects}
             events={events}
             checkins={checkins}
-            onSelectProject={handleSelectProjectFromGlobal}
+            onSelectProject={(projId) => {
+              const target = projects.find(p => p.id === projId);
+              if (target) { setActiveProject(target); setActiveTab('overview'); }
+            }}
             setEvents={(newEvts) => handleUpdateEvents(newEvts)}
           />
         )}
 
-        {/* Active Project View Content */}
         {activeTab !== 'global' && (
           activeProject ? (
             <>
@@ -564,64 +237,12 @@ export default function App() {
                   activities={activities}
                 />
               )}
-
-              {activeTab === 'messages' && (
-                <MessageBoard
-                  messages={messages}
-                  setMessages={handleUpdateMessages}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                  onAddActivity={handleAddActivity}
-                />
-              )}
-
-              {activeTab === 'todos' && (
-                <TodoList
-                  todos={todos}
-                  setTodos={handleUpdateTodos}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                  onAddActivity={handleAddActivity}
-                />
-              )}
-
-              {activeTab === 'chat' && (
-                <CampfireChat
-                  chatMessages={chatMessages}
-                  setChatMessages={handleUpdateChatMessages}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                />
-              )}
-
-              {activeTab === 'schedule' && (
-                <ScheduleCalendar
-                  events={events}
-                  setEvents={handleUpdateEvents}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                  onAddActivity={handleAddActivity}
-                />
-              )}
-
-              {activeTab === 'files' && (
-                <DocsAndFiles
-                  files={files}
-                  setFiles={handleUpdateFiles}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                  onAddActivity={handleAddActivity}
-                />
-              )}
-
-              {activeTab === 'standups' && (
-                <AutomaticCheckins
-                  checkins={checkins}
-                  setCheckins={handleUpdateCheckins}
-                  activeProject={activeProject}
-                  currentUser={currentUser}
-                />
-              )}
+              {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+              {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+              {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} currentUser={currentUser} />}
+              {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+              {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+              {activeTab === 'standups' && <AutomaticCheckins checkins={checkins} setCheckins={handleUpdateCheckins} activeProject={activeProject} currentUser={currentUser} />}
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -635,137 +256,11 @@ export default function App() {
         )}
       </main>
 
-      {/* Login & Auth Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        currentUser={currentUser}
-        setCurrentUser={setCurrentUser}
-      />
-
-      {/* Team Manager & Gmail Invite Modal */}
-      <TeamManagerModal
-        isOpen={showTeamModal}
-        onClose={() => setShowTeamModal(false)}
-        activeProject={activeProject}
-        onUpdateProjectMembers={handleUpdateProjectMembers}
-        availableRoles={availableRoles}
-        setAvailableRoles={setAvailableRoles}
-        onAddActivity={handleAddActivity}
-      />
-
-      {/* New Project Modal */}
-      {showNewProjectModal && (
-        <div className="modal-overlay" onClick={() => setShowNewProjectModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginBottom: '16px', fontWeight: 800 }}>Buat Proyek Baru</h3>
-            <form onSubmit={handleCreateProject}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Nama Proyek</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Misal: test / Portal Pelanggan Google Cloud"
-                  value={projName}
-                  onChange={(e) => setProjName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Kategori</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="Misal: Infrastructure / Mobile App"
-                  value={projCat}
-                  onChange={(e) => setProjCat(e.target.value)}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Deskripsi Singkat</label>
-                <textarea
-                  className="input-field"
-                  rows={3}
-                  placeholder="Jelaskan tujuan utama proyek ini..."
-                  value={projDesc}
-                  onChange={(e) => setProjDesc(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowNewProjectModal(false)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Buat Proyek</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Project Modal */}
-      {showEditProjectModal && activeProject && (
-        <div className="modal-overlay" onClick={() => setShowEditProjectModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginBottom: '16px', fontWeight: 800 }}>Edit Informasi Proyek</h3>
-            <form onSubmit={handleSaveEditProject}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Nama Proyek</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={projName}
-                  onChange={(e) => setProjName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Kategori</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  value={projCat}
-                  onChange={(e) => setProjCat(e.target.value)}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Deskripsi</label>
-                <textarea
-                  className="input-field"
-                  rows={3}
-                  value={projDesc}
-                  onChange={(e) => setProjDesc(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowEditProjectModal(false)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Simpan Perubahan</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirmModal && activeProject && (
-        <div className="modal-overlay" onClick={() => setShowDeleteConfirmModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-            <h3 style={{ marginBottom: '12px', fontWeight: 800, color: 'var(--g-red)' }}>Hapus Proyek?</h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Apakah Anda yakin ingin menghapus proyek <strong>"{activeProject.name}"</strong>? Seluruh data tugas dan diskusi di dalamnya akan dihapus.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="btn btn-secondary" onClick={() => setShowDeleteConfirmModal(false)}>Batal</button>
-              <button className="btn btn-primary" onClick={handleDeleteProject} style={{ background: 'var(--g-red)' }}>
-                Ya, Hapus Proyek
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} currentUser={currentUser} setCurrentUser={setCurrentUser} />
+      <TeamManagerModal isOpen={showTeamModal} onClose={() => setShowTeamModal(false)} activeProject={activeProject} onUpdateProjectMembers={handleUpdateProjectMembers} availableRoles={availableRoles} setAvailableRoles={setAvailableRoles} onAddActivity={handleAddActivity} />
+      <NewProjectModal isOpen={showNewProjectModal} onClose={() => setShowNewProjectModal(false)} projName={projName} setProjName={setProjName} projCat={projCat} setProjCat={setProjCat} projDesc={projDesc} setProjDesc={setProjDesc} onSubmit={handleCreateProject} />
+      <EditProjectModal isOpen={showEditProjectModal} onClose={() => setShowEditProjectModal(false)} projName={projName} setProjName={setProjName} projCat={projCat} setProjCat={setProjCat} projDesc={projDesc} setProjDesc={setProjDesc} onSubmit={handleSaveEditProject} />
+      <DeleteProjectModal isOpen={showDeleteConfirmModal} onClose={() => setShowDeleteConfirmModal(false)} activeProject={activeProject} onDeleteConfirm={handleDeleteProject} />
     </div>
   );
 }
