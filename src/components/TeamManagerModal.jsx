@@ -54,7 +54,7 @@ export default function TeamManagerModal({
     const newMember = {
       name: inviteName.trim() || inviteEmail.split('@')[0],
       email: inviteEmail.trim(),
-      avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 100000)}?auto=format&fit=crop&w=150&q=80`,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(inviteName.trim() || inviteEmail.split('@')[0])}&background=0D8ABC&color=fff&bold=true`,
       role: selectedRoleName,
       status: 'pending' // 'pending' | 'joined'
     };

@@ -38,6 +38,9 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
     }
   };
 
+  const defaultUploader = currentUser?.name || activeProject?.members?.[0]?.name || 'Rausal Bahtiar';
+  const [uploaderName, setUploaderName] = useState(defaultUploader);
+
   const handleUploadFile = (e) => {
     e.preventDefault();
     if (!selectedLocalFile && !customFileName.trim()) return;
@@ -65,7 +68,8 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
       url: fileUrl,
       isLocalObject: !!selectedLocalFile,
       updatedAt: 'Hari ini',
-      author: authorName
+      uploader: uploaderName || defaultUploader,
+      author: uploaderName || defaultUploader
     };
 
     const updated = [newFile, ...files];
@@ -250,6 +254,28 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
                   onChange={(e) => setCustomFileName(e.target.value)}
                   required
                 />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Pengunggah Berkas (Gmail Undangan Tim)</label>
+                <select
+                  className="input-field"
+                  value={uploaderName}
+                  onChange={(e) => setUploaderName(e.target.value)}
+                >
+                  {activeProject?.members && activeProject.members.length > 0 ? (
+                    activeProject.members.map((m, idx) => (
+                      <option key={idx} value={m.name || m.email}>
+                        {m.name} ({m.email || 'Anggota'}) - {m.role || 'Member'}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={currentUser ? currentUser.name : 'Rausal Bahtiar'}>
+                      {currentUser ? currentUser.name : 'Rausal Bahtiar'}
+                    </option>
+                  )}
+                  <option value="Semua Anggota Tim">Semua Anggota Tim</option>
+                </select>
               </div>
 
               <div style={{ marginBottom: '20px' }}>

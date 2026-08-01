@@ -24,8 +24,8 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const senderName = currentUser ? currentUser.name : 'Rausal Bahtiar';
-  const senderAvatar = currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+  const senderName = currentUser?.name || activeProject?.members?.[0]?.name || 'Pengguna';
+  const senderAvatar = currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=0D8ABC&color=fff&bold=true`;
 
   const handleSendMessage = (e) => {
     e.preventDefault();

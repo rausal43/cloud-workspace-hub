@@ -34,8 +34,9 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
     return matchesProj && matchesCat && matchesSearch;
   });
 
-  const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
-  const authorAvatar = currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
+  const defaultAuthor = currentUser?.name || activeProject?.members?.[0]?.name || 'Rausal Bahtiar';
+  const [postAuthor, setPostAuthor] = useState(defaultAuthor);
+  const authorAvatar = currentUser ? currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(postAuthor || 'User')}&background=0D8ABC&color=fff&bold=true`;
 
   const handleCreatePost = (e) => {
     e.preventDefault();
@@ -45,11 +46,11 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
       id: `msg-${Date.now()}`,
       projectId: activeProject.id,
       title,
-      author: authorName,
-      authorAvatar: authorAvatar,
-      category: category || categories[0] || 'Pengumuman',
-      date: 'Baru saja',
+      category,
       content,
+      author: postAuthor || defaultAuthor,
+      authorAvatar,
+      date: 'Baru saja',
       commentsCount: 0,
       comments: [],
       pinned: false
@@ -585,6 +586,28 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
                   onChange={(e) => setTitle(e.target.value)}
                   required
                 />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Penulis (Gmail Undangan Tim)</label>
+                <select
+                  className="input-field"
+                  value={postAuthor}
+                  onChange={(e) => setPostAuthor(e.target.value)}
+                >
+                  {activeProject?.members && activeProject.members.length > 0 ? (
+                    activeProject.members.map((m, idx) => (
+                      <option key={idx} value={m.name || m.email}>
+                        {m.name} ({m.email || 'Anggota'}) - {m.role || 'Member'}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={currentUser ? currentUser.name : 'Rausal Bahtiar'}>
+                      {currentUser ? currentUser.name : 'Rausal Bahtiar'}
+                    </option>
+                  )}
+                  <option value="Semua Anggota Tim">Semua Anggota Tim</option>
+                </select>
               </div>
 
               <div style={{ marginBottom: '14px' }}>

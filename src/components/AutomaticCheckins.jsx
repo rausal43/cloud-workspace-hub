@@ -92,7 +92,15 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {(chk.responses || []).map((resp, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: '12px', background: 'var(--bg-surface)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <img src={resp.avatar} alt={resp.author} className="avatar" />
+                  <img 
+                    src={resp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(resp.author || 'User')}&background=0D8ABC&color=fff&bold=true`} 
+                    alt={resp.author} 
+                    className="avatar" 
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(resp.author || 'User')}&background=0D8ABC&color=fff&bold=true`;
+                    }}
+                  />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{resp.author}</span>

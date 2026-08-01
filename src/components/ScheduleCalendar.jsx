@@ -48,6 +48,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
     setEvents(updated, targetUpdated, false);
   };
 
+  const defaultAssignee = currentUser?.name || activeProject?.members?.[0]?.name || 'Semua Anggota Tim';
+  const [eventAssignee, setEventAssignee] = useState(defaultAssignee);
+
   const handleAddEvent = (e) => {
     e.preventDefault();
     if (!title.trim() || !date) return;
@@ -59,6 +62,7 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
       date,
       time,
       location,
+      assignee: eventAssignee || defaultAssignee,
       color: color || '#1a73e8',
       syncGoogleCalendar,
       completed: false
@@ -292,6 +296,28 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Penanggung Jawab (Assignee Undangan Gmail)</label>
+                <select
+                  className="input-field"
+                  value={eventAssignee}
+                  onChange={(e) => setEventAssignee(e.target.value)}
+                >
+                  {activeProject?.members && activeProject.members.length > 0 ? (
+                    activeProject.members.map((m, idx) => (
+                      <option key={idx} value={m.name || m.email}>
+                        {m.name} ({m.email || 'Anggota'}) - {m.role || 'Member'}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={currentUser ? currentUser.name : 'Rausal Bahtiar'}>
+                      {currentUser ? currentUser.name : 'Rausal Bahtiar'}
+                    </option>
+                  )}
+                  <option value="Semua Anggota Tim">Semua Anggota Tim</option>
+                </select>
               </div>
 
               {/* Color Line Picker Palette */}

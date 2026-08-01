@@ -88,7 +88,7 @@ export default function App() {
           updatedMembers.push({
             name: currentUser ? currentUser.name : resolvedEmail.split('@')[0],
             email: resolvedEmail,
-            avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            avatar: currentUser ? currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedEmail.split('@')[0])}&background=0D8ABC&color=fff&bold=true`,
             role: inviteRoleName,
             status: 'joined'
           });
