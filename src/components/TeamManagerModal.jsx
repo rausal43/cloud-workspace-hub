@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle, Link } from 'lucide-react';
+import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle, Link, CheckCircle, Clock } from 'lucide-react';
 import RoleManagerModal from './RoleManagerModal';
 
 export default function TeamManagerModal({ 
@@ -30,7 +30,7 @@ export default function TeamManagerModal({
   const members = activeProject.members || [];
   const selectedRoleName = inviteRole || (availableRoles[0] ? availableRoles[0].name : 'Developer');
 
-  // Generate Real Join / Access Link
+  // Generate Real Join / Access Link with dynamic activeProject.id
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://project-management-388.pages.dev';
   const inviteLink = `${currentOrigin}/?invite=${encodeURIComponent(activeProject.id)}&role=${encodeURIComponent(selectedRoleName)}&email=${encodeURIComponent(inviteEmail || 'user')}`;
 
@@ -55,7 +55,8 @@ export default function TeamManagerModal({
       name: inviteName.trim() || inviteEmail.split('@')[0],
       email: inviteEmail.trim(),
       avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random() * 100000)}?auto=format&fit=crop&w=150&q=80`,
-      role: selectedRoleName
+      role: selectedRoleName,
+      status: 'pending' // 'pending' | 'joined'
     };
 
     const updatedMembers = [...members, newMember];
@@ -72,7 +73,7 @@ export default function TeamManagerModal({
       setCopiedLink(true);
     } catch (err) {}
 
-    setInviteSuccessMsg(`✓ Anggota ${newMember.name} ditambahkan! Link undangan telah tersalin otomatis. Kirimkan link ini ke ${inviteEmail}.`);
+    setInviteSuccessMsg(`✓ Undangan untuk ${newMember.name} berhasil dibuat & link tersalin otomatis! Kirimkan link ini ke ${inviteEmail}.`);
     setInviteEmail('');
     setInviteName('');
     
@@ -169,78 +170,98 @@ export default function TeamManagerModal({
           </div>
         </div>
 
-        {/* Tab 1: Member List & CRUD */}
+        {/* Tab 1: Member List & Status Tracker */}
         {activeTab === 'list' && (
           <div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px', maxHeight: '50vh', overflowY: 'auto' }}>
-              {members.map((m, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justify: 'space-between',
-                    padding: '12px 14px',
-                    background: 'var(--bg-main)',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-color)',
-                    flexWrap: 'wrap',
-                    gap: '10px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <img src={m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} alt={m.name} className="avatar" />
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{m.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.email || `${m.name.toLowerCase().replace(/\s+/g, '')}@gmail.com`}</div>
+              {members.map((m, idx) => {
+                const isJoined = m.status === 'joined' || idx === 0;
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justify: 'space-between',
+                      padding: '12px 14px',
+                      background: 'var(--bg-main)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      flexWrap: 'wrap',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <img src={m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} alt={m.name} className="avatar" />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {m.name}
+                          {/* Status Badge */}
+                          <span style={{
+                            fontSize: '0.68rem',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: isJoined ? 'var(--g-green-light)' : 'var(--g-yellow-light)',
+                            color: isJoined ? 'var(--g-green)' : '#b08400',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            {isJoined ? <CheckCircle size={10} /> : <Clock size={10} />}
+                            {isJoined ? 'Terhubung (Aktif)' : 'Menunggu Link Dibuka'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{m.email || `${m.name.toLowerCase().replace(/\s+/g, '')}@gmail.com`}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {editingMemberIndex === idx ? (
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          <select
+                            className="input-field"
+                            value={editedRole}
+                            onChange={(e) => setEditedRole(e.target.value)}
+                            style={{ height: '32px', padding: '2px 6px', fontSize: '0.78rem' }}
+                          >
+                            {availableRoles.map(r => (
+                              <option key={r.id} value={r.name}>{r.name}</option>
+                            ))}
+                          </select>
+                          <button className="btn btn-primary" onClick={() => handleSaveRole(idx)} style={{ padding: '4px 8px' }}>
+                            <Check size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="badge" style={{ background: `${getRoleColor(m.role)}18`, color: getRoleColor(m.role) }}>
+                          {m.role}
+                        </span>
+                      )}
+
+                      <button
+                        className="btn-icon"
+                        onClick={() => {
+                          setEditingMemberIndex(idx);
+                          setEditedRole(m.role);
+                        }}
+                        title="Edit Peran Anggota"
+                        style={{ padding: '4px' }}
+                      >
+                        <Edit3 size={14} color="var(--text-secondary)" />
+                      </button>
+                      <button
+                        className="btn-icon"
+                        onClick={() => handleRemoveMember(idx)}
+                        title="Hapus dari Tim"
+                        style={{ padding: '4px' }}
+                      >
+                        <Trash2 size={14} color="var(--g-red)" />
+                      </button>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {editingMemberIndex === idx ? (
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <select
-                          className="input-field"
-                          value={editedRole}
-                          onChange={(e) => setEditedRole(e.target.value)}
-                          style={{ height: '32px', padding: '2px 6px', fontSize: '0.78rem' }}
-                        >
-                          {availableRoles.map(r => (
-                            <option key={r.id} value={r.name}>{r.name}</option>
-                          ))}
-                        </select>
-                        <button className="btn btn-primary" onClick={() => handleSaveRole(idx)} style={{ padding: '4px 8px' }}>
-                          <Check size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="badge" style={{ background: `${getRoleColor(m.role)}18`, color: getRoleColor(m.role) }}>
-                        {m.role}
-                      </span>
-                    )}
-
-                    <button
-                      className="btn-icon"
-                      onClick={() => {
-                        setEditingMemberIndex(idx);
-                        setEditedRole(m.role);
-                      }}
-                      title="Edit Peran Anggota"
-                      style={{ padding: '4px' }}
-                    >
-                      <Edit3 size={14} color="var(--text-secondary)" />
-                    </button>
-                    <button
-                      className="btn-icon"
-                      onClick={() => handleRemoveMember(idx)}
-                      title="Hapus dari Tim"
-                      style={{ padding: '4px' }}
-                    >
-                      <Trash2 size={14} color="var(--g-red)" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
@@ -266,7 +287,7 @@ export default function TeamManagerModal({
             <div style={{ background: 'var(--g-blue-light)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(26,115,232,0.3)', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--g-blue)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Link size={16} /> LINK UNDANGAN AKSES PROYEK
+                  <Link size={16} /> LINK UNDANGAN AKSES PROYEK: {activeProject.name}
                 </span>
                 <button
                   type="button"
@@ -278,7 +299,7 @@ export default function TeamManagerModal({
                 </button>
               </div>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                Kirimkan link ini ke rekan Anda via WhatsApp / Telegram / Email. Ketika link dibuka, mereka langsung otomatis terdaftar ke dalam tim proyek!
+                Kirimkan link ini ke rekan Anda via WhatsApp / Telegram / Email. Ketika link dibuka, mereka langsung otomatis terdaftar ke dalam tim proyek <strong>"{activeProject.name}"</strong>!
               </p>
               <div style={{ fontSize: '0.78rem', background: 'var(--bg-surface)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                 {inviteLink}

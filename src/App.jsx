@@ -29,6 +29,7 @@ import {
   onSnapshot, 
   doc, 
   setDoc, 
+  getDoc,
   deleteDoc
 } from './firebase';
 
@@ -123,13 +124,6 @@ export default function App() {
   useEffect(() => {
     if (!db) return;
 
-    // Seed existing initial projects to Firestore so all users see the exact same projects
-    projects.forEach(async (p) => {
-      try {
-        await setDoc(doc(db, 'projects', p.id), p, { merge: true });
-      } catch (e) {}
-    });
-
     // 1. Projects Realtime Listener
     const unsubProjects = onSnapshot(collection(db, 'projects'), (snapshot) => {
       if (!snapshot.empty) {
@@ -137,14 +131,9 @@ export default function App() {
         setProjects(cloudProj);
         localStorage.setItem('hub_projects', JSON.stringify(cloudProj));
 
-        // Auto-select project matching currentUser email or activeProject ID
         setActiveProject(prev => {
           if (!prev) return cloudProj[0];
-          // Check if user belongs to an invited project
-          if (currentUser && currentUser.email) {
-            const memberProj = cloudProj.find(p => (p.members || []).some(m => m.email?.toLowerCase() === currentUser.email?.toLowerCase()));
-            if (memberProj) return memberProj;
-          }
+          // Check if user has an invited or matching project in cloud
           const updated = cloudProj.find(p => p.id === prev.id);
           return updated || cloudProj[0];
         });
@@ -227,34 +216,6 @@ export default function App() {
       unsubCheckins();
     };
   }, []);
-
-  // Sync active project selection when currentUser changes
-  useEffect(() => {
-    if (currentUser && currentUser.email && projects.length > 0) {
-      const userProj = projects.find(p => (p.members || []).some(m => m.email?.toLowerCase() === currentUser.email?.toLowerCase()));
-      if (userProj) {
-        setActiveProject(userProj);
-      }
-    }
-  }, [currentUser]);
-
-  // Persist LocalStorage Backups
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('hub_currentUser');
-    }
-  }, [currentUser]);
-
-  useEffect(() => { localStorage.setItem('hub_projects', JSON.stringify(projects)); }, [projects]);
-  useEffect(() => { localStorage.setItem('hub_messages', JSON.stringify(messages)); }, [messages]);
-  useEffect(() => { localStorage.setItem('hub_todos', JSON.stringify(todos)); }, [todos]);
-  useEffect(() => { localStorage.setItem('hub_chat', JSON.stringify(chatMessages)); }, [chatMessages]);
-  useEffect(() => { localStorage.setItem('hub_events', JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem('hub_files', JSON.stringify(files)); }, [files]);
-  useEffect(() => { localStorage.setItem('hub_checkins', JSON.stringify(checkins)); }, [checkins]);
-  useEffect(() => { localStorage.setItem('hub_activities', JSON.stringify(activities)); }, [activities]);
 
   // Helper to add real activity log and write to Cloud Firestore
   const handleAddActivity = async (actionText) => {
@@ -366,24 +327,58 @@ export default function App() {
     const inviteEmail = urlParams.get('email');
 
     if (inviteProjId) {
-      const targetProj = projects.find(p => p.id === inviteProjId) || projects[0];
-      if (targetProj) {
-        setActiveProject(targetProj);
-        // Check if member already in project
-        const memberEmail = currentUser ? currentUser.email : (inviteEmail || 'guest@gmail.com');
-        const exists = (targetProj.members || []).some(m => m.email?.toLowerCase() === memberEmail?.toLowerCase());
-        if (!exists) {
-          const newMember = {
-            name: currentUser ? currentUser.name : (inviteEmail ? inviteEmail.split('@')[0] : 'Anggota Baru'),
-            email: memberEmail,
-            avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-            role: inviteRoleName
-          };
-          const updatedMembers = [...(targetProj.members || []), newMember];
-          handleUpdateProjectMembers(updatedMembers);
-          handleAddActivity(`bergabung ke dalam tim proyek via link undangan`);
+      const processInviteLink = async () => {
+        // Try finding locally first
+        let targetProj = projects.find(p => p.id === inviteProjId);
+
+        // If not found locally, fetch directly from Firestore Cloud!
+        if (!targetProj && db) {
+          try {
+            const docSnap = await getDoc(doc(db, 'projects', inviteProjId));
+            if (docSnap.exists()) {
+              targetProj = { id: docSnap.id, ...docSnap.data() };
+            }
+          } catch (e) {}
         }
-      }
+
+        if (targetProj) {
+          // Add target project to projects array if missing
+          setProjects(prev => {
+            const exists = prev.some(p => p.id === targetProj.id);
+            return exists ? prev.map(p => p.id === targetProj.id ? targetProj : p) : [targetProj, ...prev];
+          });
+
+          // Switch Active Project directly to the invited project!
+          setActiveProject(targetProj);
+
+          // Update member status to 'joined'
+          const memberEmail = currentUser ? currentUser.email : (inviteEmail || 'oukiwang72@gmail.com');
+          const existingMembers = targetProj.members || [];
+          
+          const updatedMembers = existingMembers.map(m => {
+            if (m.email?.toLowerCase() === memberEmail?.toLowerCase()) {
+              return { ...m, status: 'joined' };
+            }
+            return m;
+          });
+
+          const hasMember = existingMembers.some(m => m.email?.toLowerCase() === memberEmail?.toLowerCase());
+          if (!hasMember) {
+            updatedMembers.push({
+              name: currentUser ? currentUser.name : (inviteEmail ? inviteEmail.split('@')[0] : 'Wang'),
+              email: memberEmail,
+              avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+              role: inviteRoleName,
+              status: 'joined'
+            });
+          }
+
+          handleUpdateProjectMembers(updatedMembers);
+          handleAddActivity(`bergabung ke dalam tim proyek "${targetProj.name}" via link undangan`);
+        }
+      };
+
+      processInviteLink();
     }
   }, [isDarkMode]);
 
@@ -391,19 +386,27 @@ export default function App() {
     e.preventDefault();
     if (!projName.trim()) return;
 
+    const newProjId = `proj-${Date.now()}`;
     const newProject = {
-      id: `proj-${Date.now()}`,
+      id: newProjId,
       name: projName,
       description: projDesc || 'Proyek baru berbasis Google Cloud Platform',
       category: projCat,
       color: projColor,
       updatedAt: 'Baru saja',
       members: [
-        { name: currentUser?.name || 'Admin', avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', role: 'Project Lead', email: currentUser?.email || 'admin@gmail.com' }
+        { 
+          name: currentUser?.name || 'Admin', 
+          avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', 
+          role: 'Project Lead', 
+          email: currentUser?.email || 'admin@gmail.com',
+          status: 'joined'
+        }
       ]
     };
 
-    setProjects([...projects, newProject]);
+    const updatedProjects = [newProject, ...projects];
+    setProjects(updatedProjects);
     setActiveProject(newProject);
     setProjName('');
     setProjDesc('');
@@ -452,7 +455,7 @@ export default function App() {
       } catch (err) {}
     }
 
-    handleAddActivity(`memperbarui informasi proyek menjadi ${projName}`);
+    handleAddActivity(`memperbarui informasi proyek menjadi "${projName}"`);
   };
 
   const handleDeleteProject = async () => {
@@ -710,7 +713,7 @@ export default function App() {
                 <input
                   type="text"
                   className="input-field"
-                  placeholder="Misal: Portal Pelanggan Google Cloud"
+                  placeholder="Misal: test / Portal Pelanggan Google Cloud"
                   value={projName}
                   onChange={(e) => setProjName(e.target.value)}
                   required
