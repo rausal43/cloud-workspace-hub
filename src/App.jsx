@@ -35,33 +35,65 @@ const INITIAL_ROLES = [
 
 export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [projects, setProjects] = useState(INITIAL_PROJECTS);
-  const [activeProject, setActiveProject] = useState(INITIAL_PROJECTS[0]);
+
+  // Load Projects from LocalStorage if available
+  const [projects, setProjects] = useState(() => {
+    const saved = localStorage.getItem('hub_projects');
+    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+  });
+
+  const [activeProject, setActiveProject] = useState(() => projects[0] || INITIAL_PROJECTS[0]);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Available Roles & Access Control State
+  // Available Roles State
   const [availableRoles, setAvailableRoles] = useState(INITIAL_ROLES);
 
   // Dynamic Real Activities Feed State
-  const [activities, setActivities] = useState([]);
+  const [activities, setActivities] = useState(() => {
+    const saved = localStorage.getItem('hub_activities');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // User & Auth State
-  const [currentUser, setCurrentUser] = useState({
-    id: 'usr-1',
-    name: 'Budi Santoso',
-    email: 'budi.santoso@gmail.com',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    role: 'Project Lead',
-    provider: 'Google Workspace'
+  // User & Auth State (Persisted in LocalStorage)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUser = localStorage.getItem('hub_currentUser');
+    if (savedUser) {
+      try { return JSON.parse(savedUser); } catch (e) {}
+    }
+    // Default to NULL (Logged Out) so user logs in as their real account!
+    return null;
   });
 
   // Module States
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
-  const [todos, setTodos] = useState(INITIAL_TODOS);
-  const [chatMessages, setChatMessages] = useState(INITIAL_CHAT_MESSAGES);
-  const [files, setFiles] = useState(INITIAL_FILES);
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [checkins, setCheckins] = useState(INITIAL_CHECKINS);
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('hub_messages');
+    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
+  });
+
+  const [todos, setTodos] = useState(() => {
+    const saved = localStorage.getItem('hub_todos');
+    return saved ? JSON.parse(saved) : INITIAL_TODOS;
+  });
+
+  const [chatMessages, setChatMessages] = useState(() => {
+    const saved = localStorage.getItem('hub_chat');
+    return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
+  });
+
+  const [files, setFiles] = useState(() => {
+    const saved = localStorage.getItem('hub_files');
+    return saved ? JSON.parse(saved) : INITIAL_FILES;
+  });
+
+  const [events, setEvents] = useState(() => {
+    const saved = localStorage.getItem('hub_events');
+    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
+  });
+
+  const [checkins, setCheckins] = useState(() => {
+    const saved = localStorage.getItem('hub_checkins');
+    return saved ? JSON.parse(saved) : INITIAL_CHECKINS;
+  });
 
   // Modals state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -76,6 +108,25 @@ export default function App() {
   const [projDesc, setProjDesc] = useState('');
   const [projCat, setProjCat] = useState('Productivity');
   const [projColor, setProjColor] = useState('#1a73e8');
+
+  // Persist Current User in LocalStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('hub_currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('hub_currentUser');
+    }
+  }, [currentUser]);
+
+  // Persist Projects in LocalStorage
+  useEffect(() => {
+    localStorage.setItem('hub_projects', JSON.stringify(projects));
+  }, [projects]);
+
+  // Persist Activities in LocalStorage
+  useEffect(() => {
+    localStorage.setItem('hub_activities', JSON.stringify(activities));
+  }, [activities]);
 
   // Helper to add real activity log
   const handleAddActivity = (actionText) => {
@@ -107,7 +158,7 @@ export default function App() {
         const exists = (targetProj.members || []).some(m => m.email === memberEmail);
         if (!exists) {
           const newMember = {
-            name: currentUser ? currentUser.name : 'Anggota Undangan',
+            name: currentUser ? currentUser.name : (inviteEmail ? inviteEmail.split('@')[0] : 'Anggota Baru'),
             email: memberEmail,
             avatar: currentUser ? currentUser.avatar : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
             role: inviteRoleName
@@ -132,7 +183,7 @@ export default function App() {
       color: projColor,
       updatedAt: 'Baru saja',
       members: [
-        { name: currentUser?.name || 'Budi Santoso', avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', role: 'Project Lead', email: currentUser?.email || 'budi.santoso@gmail.com' }
+        { name: currentUser?.name || 'Admin', avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', role: 'Project Lead', email: currentUser?.email || 'admin@gmail.com' }
       ]
     };
 
