@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle, Sparkles } from 'lucide-react';
+import { Users, Mail, Plus, Trash2, Edit3, Check, Send, ShieldCheck, Copy, ExternalLink, AlertCircle, Link } from 'lucide-react';
 import RoleManagerModal from './RoleManagerModal';
 
 export default function TeamManagerModal({ 
@@ -20,7 +20,6 @@ export default function TeamManagerModal({
   const [inviteRole, setInviteRole] = useState(availableRoles[0]?.name || 'Developer');
   const [inviteSuccessMsg, setInviteSuccessMsg] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Edit member role state
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
@@ -39,17 +38,18 @@ export default function TeamManagerModal({
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
+      setInviteSuccessMsg(`✓ Link undangan fisik berhasil disalin! Kirimkan link ini via WA/Email ke ${inviteEmail || 'rekan tim'}.`);
+      setTimeout(() => {
+        setCopiedLink(false);
+      }, 3000);
     } catch (err) {
-      alert("Link Undangan: " + inviteLink);
+      alert("Link Undangan Proyek: " + inviteLink);
     }
   };
 
   const handleSendGmailInvite = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
-
-    setSendingEmail(true);
 
     const newMember = {
       name: inviteName.trim() || inviteEmail.split('@')[0],
@@ -66,45 +66,13 @@ export default function TeamManagerModal({
       onAddActivity(`Mengundang ${newMember.name} (${newMember.email}) sebagai ${selectedRoleName}`);
     }
 
-    // Call Cloudflare Pages Backend API (/api/invite)
-    try {
-      await fetch('/api/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: inviteEmail.trim(),
-          projectName: activeProject.name,
-          inviteLink,
-          role: selectedRoleName
-        })
-      });
-    } catch (err) {
-      console.log("Backend invite API dispatch:", err);
-    }
-
-    // Prepare Email Content for Gmail Web Composer Fallback
-    const subject = encodeURIComponent(`Undangan Akses Bergabung Proyek: ${activeProject.name}`);
-    const bodyText = encodeURIComponent(
-      `Halo ${newMember.name},\n\nAnda diundang untuk bergabung ke dalam proyek "${activeProject.name}" sebagai ${selectedRoleName}.\n\nKlik link di bawah ini untuk mengakses ruang kerja proyek:\n${inviteLink}\n\nSalam,\nTim ${activeProject.name}`
-    );
-    const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inviteEmail.trim())}&su=${subject}&body=${bodyText}`;
-
     // Auto Copy Invite Link
     try {
       await navigator.clipboard.writeText(inviteLink);
       setCopiedLink(true);
     } catch (err) {}
 
-    // Open Web Composer in new tab
-    const newTab = window.open(gmailWebUrl, '_blank');
-    if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-      // Browser blocked popup
-      setInviteSuccessMsg(`✓ Anggota ditambahkan! Link undangan telah disalin ke clipboard. Kirimkan link ini ke ${inviteEmail}.`);
-    } else {
-      setInviteSuccessMsg(`✓ Anggota ditambahkan! Tab Gmail telah dibuka. Klik 'Send' pada tab Gmail.`);
-    }
-
-    setSendingEmail(false);
+    setInviteSuccessMsg(`✓ Anggota ${newMember.name} ditambahkan! Link undangan telah tersalin otomatis. Kirimkan link ini ke ${inviteEmail}.`);
     setInviteEmail('');
     setInviteName('');
     
@@ -294,12 +262,26 @@ export default function TeamManagerModal({
         {/* Tab 2: Invite via Gmail Form & Direct Link Generator */}
         {activeTab === 'invite' && (
           <form onSubmit={handleSendGmailInvite}>
-            <div style={{ background: 'var(--g-blue-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '14px', fontSize: '0.8rem', color: 'var(--g-blue)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <strong>Dua Cara Mengirimkan Undangan:</strong>
-                <br />1. Klik <strong>"Salin Link"</strong> dan kirimkan link tersebut via Chat/WA/Email ke rekan Anda.
-                <br />2. Klik tombol biru di bawah untuk membuka tab draf Gmail.
+            {/* Prominent Direct Copy Box */}
+            <div style={{ background: 'var(--g-blue-light)', padding: '14px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(26,115,232,0.3)', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--g-blue)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Link size={16} /> LINK UNDANGAN AKSES PROYEK
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyInviteLink}
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.78rem', padding: '4px 12px' }}
+                >
+                  <Copy size={13} /> {copiedLink ? '✓ Link Tersalin!' : 'Salin Link Access'}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Kirimkan link ini ke rekan Anda via WhatsApp / Telegram / Email. Ketika link dibuka, mereka langsung otomatis terdaftar ke dalam tim proyek!
+              </p>
+              <div style={{ fontSize: '0.78rem', background: 'var(--bg-surface)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                {inviteLink}
               </div>
             </div>
 
@@ -355,23 +337,6 @@ export default function TeamManagerModal({
               </select>
             </div>
 
-            {/* Direct Join Link Preview & Copy */}
-            <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>LINK AKSES / UNDANGAN LANGSUNG</span>
-                <button
-                  type="button"
-                  onClick={handleCopyInviteLink}
-                  style={{ background: 'none', border: 'none', color: 'var(--g-blue)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <Copy size={12} /> {copiedLink ? '✓ Tersalin!' : 'Salin Link'}
-                </button>
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                {inviteLink}
-              </div>
-            </div>
-
             {inviteSuccessMsg && (
               <div style={{ color: 'var(--g-green)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Check size={16} /> {inviteSuccessMsg}
@@ -382,8 +347,8 @@ export default function TeamManagerModal({
               <button type="button" className="btn btn-secondary" onClick={() => setActiveTab('list')}>
                 Kembali ke Daftar Tim
               </button>
-              <button type="submit" className="btn btn-primary" disabled={sendingEmail}>
-                <Send size={16} /> {sendingEmail ? 'Memproses...' : 'Kirim Undangan Gmail'}
+              <button type="submit" className="btn btn-primary">
+                <Send size={16} /> Tambah & Salin Link Undangan
               </button>
             </div>
           </form>
