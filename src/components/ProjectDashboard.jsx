@@ -26,11 +26,19 @@ export default function ProjectDashboard({
 }) {
   if (!activeProject) return null;
 
-  // Calculate To-Do statistics
+  // Filter core module items strictly for active project
+  const projectMessages = (messages || []).filter(m => m.projectId === activeProject.id);
+  const projectTodos = (todos || []).filter(t => t.projectId === activeProject.id);
+  const projectChatMessages = (chatMessages || []).filter(c => c.projectId === activeProject.id);
+  const projectEvents = (events || []).filter(e => e.projectId === activeProject.id);
+  const projectFiles = (files || []).filter(f => f.projectId === activeProject.id);
+  const projectCheckins = (checkins || []).filter(c => c.projectId === activeProject.id);
+
+  // Calculate To-Do statistics for this project only
   let totalTasks = 0;
   let completedTasks = 0;
-  todos.forEach(cat => {
-    cat.items.forEach(item => {
+  projectTodos.forEach(cat => {
+    (cat.items || []).forEach(item => {
       totalTasks++;
       if (item.completed) completedTasks++;
     });
@@ -118,11 +126,11 @@ export default function ProjectDashboard({
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--g-blue-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--g-blue)' }}>
                 <MessageSquare size={20} />
               </div>
-              <span className="badge badge-blue">{messages.length} Postingan</span>
+              <span className="badge badge-blue">{projectMessages.length} Postingan</span>
             </div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Diskusi & Pengumuman</h3>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {messages[0] ? `Terakhir: "${messages[0].title}"` : 'Posting pengumuman & diskusi tim'}
+              {projectMessages[0] ? `Terakhir: "${projectMessages[0].title}"` : 'Posting pengumuman & diskusi tim'}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--g-blue)', fontSize: '0.825rem', fontWeight: 700, marginTop: '12px' }}>
@@ -165,12 +173,12 @@ export default function ProjectDashboard({
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--g-yellow-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b08400' }}>
                 <MessageCircle size={20} />
               </div>
-              <span className="badge badge-yellow">{chatMessages.length} Pesan</span>
+              <span className="badge badge-yellow">{projectChatMessages.length} Pesan</span>
             </div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Obrolan Tim (Realtime Chat)</h3>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {chatMessages[chatMessages.length - 1] 
-                ? `${chatMessages[chatMessages.length - 1].sender}: "${chatMessages[chatMessages.length - 1].text}"`
+              {projectChatMessages[projectChatMessages.length - 1] 
+                ? `${projectChatMessages[projectChatMessages.length - 1].sender}: "${projectChatMessages[projectChatMessages.length - 1].text}"`
                 : 'Saluran obrolan langsung tim via Firestore'}
             </p>
           </div>
@@ -190,11 +198,11 @@ export default function ProjectDashboard({
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--g-blue-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--g-blue)' }}>
                 <CalendarIcon size={20} />
               </div>
-              <span className="badge badge-blue">{events.length} Agenda</span>
+              <span className="badge badge-blue">{projectEvents.length} Agenda</span>
             </div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Kalender & Milestone</h3>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {events[0] ? `Mendatang: ${events[0].title} (${events[0].date})` : 'Sinkronisasi agenda dengan Google Calendar'}
+              {projectEvents[0] ? `Mendatang: ${projectEvents[0].title} (${projectEvents[0].date})` : 'Sinkronisasi agenda dengan Google Calendar'}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--g-blue)', fontSize: '0.825rem', fontWeight: 700, marginTop: '12px' }}>
@@ -213,7 +221,7 @@ export default function ProjectDashboard({
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--g-yellow-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b08400' }}>
                 <HardDrive size={20} />
               </div>
-              <span className="badge badge-yellow">{files.length} Berkas</span>
+              <span className="badge badge-yellow">{projectFiles.length} Berkas</span>
             </div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Google Drive & Berkas</h3>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
@@ -236,11 +244,11 @@ export default function ProjectDashboard({
               <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--g-red-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--g-red)' }}>
                 <HelpCircle size={20} />
               </div>
-              <span className="badge badge-red">{checkins.length} Pertanyaan</span>
+              <span className="badge badge-red">{projectCheckins.length} Pertanyaan</span>
             </div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '4px' }}>Standup Otomatis (Status Report)</h3>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {checkins[0] ? `Aktif: "${checkins[0].question}"` : 'Pengumpulan status harian otomatis'}
+              {projectCheckins[0] ? `Aktif: "${projectCheckins[0].question}"` : 'Pengumpulan status harian otomatis'}
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--g-red)', fontSize: '0.825rem', fontWeight: 700, marginTop: '12px' }}>
@@ -250,27 +258,34 @@ export default function ProjectDashboard({
       </div>
 
       {/* Dynamic Real Activity Feed */}
-      <div className="glass-card" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Activity color="var(--g-blue)" size={18} /> Aktivitas Terbaru Proyek
-        </h3>
+      {(() => {
+        const projectActivities = activities.filter(act => 
+          act.projectId === activeProject?.id
+        );
+        return (
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity color="var(--g-blue)" size={18} /> Aktivitas Terbaru Proyek
+            </h3>
 
-        {activities.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
-            {activities.map(act => (
-              <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-blue)', flexShrink: 0 }} />
-                <span><strong>{act.user}</strong> {act.action}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{act.time}</span>
+            {projectActivities.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.85rem' }}>
+                {projectActivities.map(act => (
+                  <div key={act.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--g-blue)', flexShrink: 0 }} />
+                    <span><strong>{act.user}</strong> {act.action}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{act.time}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                Belum ada aktivitas terbaru dalam proyek ini.
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            Belum ada aktivitas terbaru dalam proyek ini.
-          </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }

@@ -124,7 +124,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
 
   // Filter events based on active project & hideCompleted
   const filteredEvents = events.filter(evt => {
-    if (evt.projectId && evt.projectId !== activeProject?.id) return false;
+    const isMatchId = evt.projectId === activeProject?.id;
+    const isMatchName = activeProject?.name && String(evt.projectId).toLowerCase() === activeProject.name.toLowerCase();
+    if (!isMatchId && !isMatchName) return false;
     if (hideCompleted && evt.completed) return false;
     return true;
   });

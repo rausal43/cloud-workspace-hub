@@ -41,7 +41,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
   const defaultUploader = currentUser?.name || activeProject?.members?.[0]?.name || 'Rausal Bahtiar';
   const [uploaderName, setUploaderName] = useState(defaultUploader);
 
-  const handleUploadFile = (e) => {
+  const handleUploadFile = async (e) => {
     e.preventDefault();
     if (!selectedLocalFile && !customFileName.trim()) return;
 
@@ -56,7 +56,19 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
       detectedType = 'sheet';
     }
 
-    const fileUrl = selectedLocalFile ? URL.createObjectURL(selectedLocalFile) : 'https://drive.google.com';
+    let fileUrl = 'https://drive.google.com';
+    if (selectedLocalFile) {
+      if (selectedLocalFile.size < 5 * 1024 * 1024) {
+        fileUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target.result);
+          reader.onerror = () => resolve(URL.createObjectURL(selectedLocalFile));
+          reader.readAsDataURL(selectedLocalFile);
+        });
+      } else {
+        fileUrl = URL.createObjectURL(selectedLocalFile);
+      }
+    }
 
     const newFile = {
       id: `file-${Date.now()}`,
@@ -87,6 +99,14 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
     if (previewFile?.id === fileId) setPreviewFile(null);
     notify?.('Berkas berhasil dihapus', 'delete');
   };
+
+  // Filter files strictly for current active project
+  const projectFiles = files.filter(f => {
+    if (!activeProject) return false;
+    const isMatchId = f.projectId === activeProject.id;
+    const isMatchName = activeProject.name && String(f.projectId).toLowerCase() === activeProject.name.toLowerCase();
+    return isMatchId || isMatchName;
+  });
 
   return (
     <div style={{ padding: '8px 0' }}>
@@ -134,39 +154,40 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
           </div>
           <div>
             <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Penyimpanan Google Drive Proyek</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{files.length} Berkas • Tersimpan aman di Cloud</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{projectFiles.length} Berkas • Tersimpan aman di Cloud</div>
           </div>
         </div>
         <span className="badge badge-green">Google Drive Sync Active</span>
       </div>
 
       {/* Files Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-        {files.filter(f => !f.projectId || f.projectId === activeProject?.id).map(file => (
-          <div key={file.id} className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                {getFileIcon(file.type)}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{file.source}</span>
-                  <button
-                    className="btn-icon"
-                    onClick={() => handleDeleteFile(file.id)}
-                    title="Hapus File"
-                    style={{ padding: '4px' }}
-                  >
-                    <Trash2 size={14} color="var(--g-red)" />
-                  </button>
+      {projectFiles.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+          {projectFiles.map(file => (
+            <div key={file.id} className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  {getFileIcon(file.type)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{file.source}</span>
+                    <button
+                      className="btn-icon"
+                      onClick={() => handleDeleteFile(file.id)}
+                      title="Hapus File"
+                      style={{ padding: '4px' }}
+                    >
+                      <Trash2 size={14} color="var(--g-red)" />
+                    </button>
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </h4>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  {file.size} • Diunggah oleh {file.author}
                 </div>
               </div>
-
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {file.name}
-              </h4>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                {file.size} • Diunggah oleh {file.author}
-              </div>
-            </div>
 
             <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
               <button
@@ -190,6 +211,13 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
           </div>
         ))}
       </div>
+      ) : (
+        <div className="glass-card" style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <HardDrive size={38} color="var(--g-yellow)" style={{ marginBottom: '10px', opacity: 0.7 }} />
+          <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Belum Ada Berkas di Proyek Ini</h4>
+          <p style={{ fontSize: '0.85rem' }}>Unggah file komputer Anda atau buat Google Doc baru menggunakan tombol di atas.</p>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {previewFile && (

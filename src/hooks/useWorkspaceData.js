@@ -26,13 +26,29 @@ export function isMatchProject(itemProjectId, activeProject, allProjects = []) {
   return false;
 }
 
+export function isUserMemberOfProject(project, user) {
+  if (!project) return false;
+  // Require login: Unauthenticated users cannot access private projects
+  if (!user || !user.email) return false;
+  if (!Array.isArray(project.members) || project.members.length === 0) return false;
+
+  const userEmail = user.email.trim().toLowerCase();
+  return project.members.some(m => m && m.email && m.email.trim().toLowerCase() === userEmail);
+}
+
 export function useWorkspaceData(currentUser) {
   // State initialization with LocalStorage fallbacks
   const [projects, setProjects] = useState(() => {
     const saved = localStorage.getItem('hub_projects');
     return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
   });
-  const [activeProject, setActiveProject] = useState(() => projects[0] || INITIAL_PROJECTS[0]);
+  const [activeProject, setActiveProject] = useState(() => {
+    if (!currentUser) return null;
+    const saved = localStorage.getItem('hub_projects');
+    const allProjs = saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+    const allowed = allProjs.filter(p => isUserMemberOfProject(p, currentUser));
+    return allowed[0] || null;
+  });
   const [activities, setActivities] = useState(() => {
     const saved = localStorage.getItem('hub_activities');
     return saved ? JSON.parse(saved) : [];
@@ -73,53 +89,89 @@ export function useWorkspaceData(currentUser) {
         setProjects(projData);
         localStorage.setItem('hub_projects', JSON.stringify(projData));
         setActiveProject(prev => {
-          if (!prev) return projData[0];
-          return projData.find(p => p.id === prev.id) || 
-                 projData.find(p => p.name?.toLowerCase() === prev.name?.toLowerCase()) || 
-                 projData[0];
+          if (!currentUser) return null;
+          const allowed = projData.filter(p => isUserMemberOfProject(p, currentUser));
+          if (allowed.length === 0) return null;
+          if (prev && allowed.some(p => p.id === prev.id)) return prev;
+          return allowed[0] || null;
         });
       }
 
       const msgData = await dbService.fetchMessagesFromDb();
-      if (msgData && Array.isArray(msgData) && msgData.length > 0) { 
-        setMessages(msgData); 
-        localStorage.setItem('hub_messages', JSON.stringify(msgData)); 
+      if (msgData && Array.isArray(msgData)) {
+        setMessages(prev => {
+          const dbIds = new Set(msgData.map(m => String(m.id)));
+          const localOnly = prev.filter(m => m && m.id && !dbIds.has(String(m.id)));
+          const merged = [...msgData, ...localOnly];
+          localStorage.setItem('hub_messages', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const todoData = await dbService.fetchTodosFromDb();
-      if (todoData && Array.isArray(todoData) && todoData.length > 0) { 
-        setTodos(todoData); 
-        localStorage.setItem('hub_todos', JSON.stringify(todoData)); 
+      if (todoData && Array.isArray(todoData)) {
+        setTodos(prev => {
+          const dbIds = new Set(todoData.map(t => String(t.id)));
+          const localOnly = prev.filter(t => t && t.id && !dbIds.has(String(t.id)));
+          const merged = [...todoData, ...localOnly];
+          localStorage.setItem('hub_todos', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const chatData = await dbService.fetchChatMessagesFromDb();
-      if (chatData && Array.isArray(chatData) && chatData.length > 0) { 
-        setChatMessages(chatData); 
-        localStorage.setItem('hub_chat', JSON.stringify(chatData)); 
+      if (chatData && Array.isArray(chatData)) {
+        setChatMessages(prev => {
+          const dbIds = new Set(chatData.map(c => String(c.id)));
+          const localOnly = prev.filter(c => c && c.id && !dbIds.has(String(c.id)));
+          const merged = [...chatData, ...localOnly];
+          localStorage.setItem('hub_chat', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const fileData = await dbService.fetchFilesFromDb();
-      if (fileData && Array.isArray(fileData) && fileData.length > 0) { 
-        setFiles(fileData); 
-        localStorage.setItem('hub_files', JSON.stringify(fileData)); 
+      if (fileData && Array.isArray(fileData)) {
+        setFiles(prev => {
+          const dbIds = new Set(fileData.map(f => String(f.id)));
+          const localOnly = prev.filter(f => f && f.id && !dbIds.has(String(f.id)));
+          const merged = [...fileData, ...localOnly];
+          localStorage.setItem('hub_files', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const eventData = await dbService.fetchEventsFromDb();
-      if (eventData && Array.isArray(eventData) && eventData.length > 0) { 
-        setEvents(eventData); 
-        localStorage.setItem('hub_events', JSON.stringify(eventData)); 
+      if (eventData && Array.isArray(eventData)) {
+        setEvents(prev => {
+          const dbIds = new Set(eventData.map(e => String(e.id)));
+          const localOnly = prev.filter(e => e && e.id && !dbIds.has(String(e.id)));
+          const merged = [...eventData, ...localOnly];
+          localStorage.setItem('hub_events', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const checkinData = await dbService.fetchCheckinsFromDb();
-      if (checkinData && Array.isArray(checkinData) && checkinData.length > 0) { 
-        setCheckins(checkinData); 
-        localStorage.setItem('hub_checkins', JSON.stringify(checkinData)); 
+      if (checkinData && Array.isArray(checkinData)) {
+        setCheckins(prev => {
+          const dbIds = new Set(checkinData.map(c => String(c.id)));
+          const localOnly = prev.filter(c => c && c.id && !dbIds.has(String(c.id)));
+          const merged = [...checkinData, ...localOnly];
+          localStorage.setItem('hub_checkins', JSON.stringify(merged));
+          return merged;
+        });
       }
 
       const actData = await dbService.fetchActivitiesFromDb();
-      if (actData && Array.isArray(actData) && actData.length > 0) { 
-        setActivities(actData); 
-        localStorage.setItem('hub_activities', JSON.stringify(actData)); 
+      if (actData && Array.isArray(actData)) {
+        setActivities(prev => {
+          const dbIds = new Set(actData.map(a => String(a.id)));
+          const localOnly = prev.filter(a => a && a.id && !dbIds.has(String(a.id)));
+          const merged = [...actData, ...localOnly];
+          localStorage.setItem('hub_activities', JSON.stringify(merged));
+          return merged;
+        });
       }
     };
 
@@ -134,7 +186,7 @@ export function useWorkspaceData(currentUser) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUser]);
 
   // 2. BroadcastChannel for instant same-browser cross-tab sync
   useEffect(() => {
@@ -177,9 +229,11 @@ export function useWorkspaceData(currentUser) {
   };
 
   // Helper Mutation Wrappers
-  const handleAddActivity = async (actionText) => {
+  const handleAddActivity = async (actionText, customProjId = null) => {
+    const targetProjId = customProjId || (activeProject ? activeProject.id : null);
     const newAct = {
       id: `act-${Date.now()}`,
+      projectId: targetProjId,
       user: currentUser ? currentUser.name : 'Pengguna',
       action: actionText,
       time: 'Baru saja',

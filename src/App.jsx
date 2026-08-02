@@ -13,9 +13,9 @@ import LoginModal from './components/LoginModal';
 import TeamManagerModal from './components/TeamManagerModal';
 import { NewProjectModal, EditProjectModal, DeleteProjectModal } from './components/ProjectModals';
 
-import { useWorkspaceData } from './hooks/useWorkspaceData';
+import { useWorkspaceData, isUserMemberOfProject } from './hooks/useWorkspaceData';
 import * as dbService from './services/supabaseService';
-import { Plus } from 'lucide-react';
+import { Plus, Lock, LogIn } from 'lucide-react';
 
 const INITIAL_ROLES = [
   { id: 'role-lead', name: 'Project Lead', level: 'Admin', canEdit: true, canDelete: true, canInvite: true, canManageProject: true, color: '#1a73e8' },
@@ -50,10 +50,37 @@ export default function App() {
     broadcastSync
   } = useWorkspaceData(currentUser);
 
-  // Unread Notification Tracker
+  // Filter projects accessible to current user
+  const userProjects = projects.filter(p => isUserMemberOfProject(p, currentUser));
+
+  // Sync active project if user loses or lacks access to current activeProject
+  useEffect(() => {
+    if (!currentUser) {
+      setActiveProject(null);
+      return;
+    }
+    if (userProjects.length > 0) {
+      if (!activeProject || !userProjects.some(p => p.id === activeProject.id)) {
+        setActiveProject(userProjects[0]);
+      }
+    } else {
+      setActiveProject(null);
+    }
+  }, [currentUser, projects]);
+
+  // Unread Notification Tracker Engine across all 6 sub-features
   const [lastVisitedTabs, setLastVisitedTabs] = useState(() => {
     const saved = localStorage.getItem('hub_lastVisitedTabs');
-    return saved ? JSON.parse(saved) : { overview: Date.now() };
+    const now = Date.now();
+    return saved ? JSON.parse(saved) : { 
+      overview: now,
+      messages: now - 3600000,
+      todos: now - 3600000,
+      chat: now - 3600000,
+      schedule: now - 3600000,
+      files: now - 3600000,
+      standups: now - 3600000
+    };
   });
 
   const handleSelectTab = (tabId) => {
@@ -63,28 +90,93 @@ export default function App() {
     localStorage.setItem('hub_lastVisitedTabs', JSON.stringify(updated));
   };
 
-  const getUnreadCount = (tabId, items = []) => {
-    const lastTime = lastVisitedTabs[tabId] || 0;
-    if (!lastTime) return 0;
-    const projItems = items.filter(i => !i.projectId || i.projectId === activeProject?.id);
-    return projItems.filter(i => {
-      let itemTime = i.createdAt;
-      if (!itemTime && i.id) {
-        const digits = String(i.id).replace(/\D/g, '');
-        itemTime = digits ? parseInt(digits.slice(-13)) || 0 : 0;
-      }
-      return (itemTime || 0) > lastTime;
-    }).length;
+  const extractItemTimestamp = (item) => {
+    if (!item) return 0;
+    if (typeof item.createdAt === 'number' && item.createdAt > 0) return item.createdAt;
+    if (item.id) {
+      const match = String(item.id).match(/\d{10,}/);
+      if (match) return parseInt(match[0]);
+    }
+    return 0;
   };
 
-  const unreadCounts = {
-    messages: getUnreadCount('messages', messages),
-    todos: getUnreadCount('todos', todos),
-    chat: getUnreadCount('chat', chatMessages),
-    schedule: getUnreadCount('schedule', events),
-    files: getUnreadCount('files', files),
-    standups: getUnreadCount('standups', checkins)
+  const isItemForActiveProject = (itemProjId) => {
+    if (!currentUser || !activeProject) return false;
+    if (!itemProjId) return false;
+    if (itemProjId === activeProject.id) return true;
+    if (activeProject.name && Array.isArray(userProjects)) {
+      const proj = userProjects.find(p => p.id === itemProjId);
+      if (proj && proj.name && proj.name.toLowerCase() === activeProject.name.toLowerCase()) return true;
+    }
+    return false;
   };
+
+  const calculateUnreadCounts = () => {
+    const defaultTime = Date.now() - 3600000;
+
+    // 1. Messages (Diskusi & Pengumuman)
+    const lastMsg = lastVisitedTabs.messages || defaultTime;
+    const unreadMessages = messages.filter(m => 
+      isItemForActiveProject(m.projectId) && extractItemTimestamp(m) > lastMsg
+    ).length;
+
+    // 2. Todos (Manajemen Tugas - check categories & inner items)
+    const lastTodo = lastVisitedTabs.todos || defaultTime;
+    let unreadTodos = 0;
+    todos.forEach(cat => {
+      if (isItemForActiveProject(cat.projectId)) {
+        if (extractItemTimestamp(cat) > lastTodo) unreadTodos++;
+        if (Array.isArray(cat.items)) {
+          cat.items.forEach(it => {
+            if (extractItemTimestamp(it) > lastTodo) unreadTodos++;
+          });
+        }
+      }
+    });
+
+    // 3. Chat (Obrolan Tim)
+    const lastChat = lastVisitedTabs.chat || defaultTime;
+    const unreadChat = chatMessages.filter(c => 
+      isItemForActiveProject(c.projectId) && extractItemTimestamp(c) > lastChat
+    ).length;
+
+    // 4. Schedule (Kalender)
+    const lastSched = lastVisitedTabs.schedule || defaultTime;
+    const unreadSchedule = events.filter(e => 
+      isItemForActiveProject(e.projectId) && extractItemTimestamp(e) > lastSched
+    ).length;
+
+    // 5. Files (Google Drive & File)
+    const lastFile = lastVisitedTabs.files || defaultTime;
+    const unreadFiles = files.filter(f => 
+      isItemForActiveProject(f.projectId) && extractItemTimestamp(f) > lastFile
+    ).length;
+
+    // 6. Standups (Standup Otomatis)
+    const lastStandup = lastVisitedTabs.standups || defaultTime;
+    let unreadStandups = 0;
+    checkins.forEach(chk => {
+      if (isItemForActiveProject(chk.projectId)) {
+        if (extractItemTimestamp(chk) > lastStandup) unreadStandups++;
+        if (Array.isArray(chk.responses)) {
+          chk.responses.forEach(r => {
+            if (extractItemTimestamp(r) > lastStandup) unreadStandups++;
+          });
+        }
+      }
+    });
+
+    return {
+      messages: unreadMessages,
+      todos: unreadTodos,
+      chat: unreadChat,
+      schedule: unreadSchedule,
+      files: unreadFiles,
+      standups: unreadStandups
+    };
+  };
+
+  const unreadCounts = calculateUnreadCounts();
 
   // Available Roles & Modals state
   const [availableRoles, setAvailableRoles] = useState(INITIAL_ROLES);
@@ -112,30 +204,31 @@ export default function App() {
     if (inviteProjId) {
       let targetProj = projects.find(p => p.id === inviteProjId) || projects[0];
       if (targetProj) {
-        let resolvedEmail = currentUser ? currentUser.email : inviteEmail;
-        if (!resolvedEmail || resolvedEmail === 'user') resolvedEmail = 'sepedab746@gmail.com';
+        let resolvedEmail = currentUser ? currentUser.email : (inviteEmail && inviteEmail !== 'user' ? inviteEmail : null);
 
-        const existingMembers = targetProj.members || [];
-        const updatedMembers = existingMembers.map(m => 
-          m.email?.toLowerCase() === resolvedEmail?.toLowerCase() ? { ...m, status: 'joined' } : m
-        );
+        if (resolvedEmail) {
+          const existingMembers = targetProj.members || [];
+          const updatedMembers = existingMembers.map(m => 
+            m.email?.toLowerCase() === resolvedEmail?.toLowerCase() ? { ...m, status: 'joined' } : m
+          );
 
-        if (!existingMembers.some(m => m.email?.toLowerCase() === resolvedEmail?.toLowerCase())) {
-          updatedMembers.push({
-            name: currentUser ? currentUser.name : resolvedEmail.split('@')[0],
-            email: resolvedEmail,
-            avatar: currentUser ? currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedEmail.split('@')[0])}&background=0D8ABC&color=fff&bold=true`,
-            role: inviteRoleName,
-            status: 'joined'
-          });
+          if (!existingMembers.some(m => m.email?.toLowerCase() === resolvedEmail?.toLowerCase())) {
+            updatedMembers.push({
+              name: currentUser ? currentUser.name : resolvedEmail.split('@')[0],
+              email: resolvedEmail,
+              avatar: currentUser ? currentUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(resolvedEmail.split('@')[0])}&background=0D8ABC&color=fff&bold=true`,
+              role: inviteRoleName,
+              status: 'joined'
+            });
+          }
+
+          const finalProj = { ...targetProj, members: updatedMembers };
+          const updatedProjects = projects.map(p => p.id === finalProj.id ? finalProj : p);
+          setProjects(updatedProjects);
+          setActiveProject(finalProj);
+          broadcastSync({ projects: updatedProjects });
+          dbService.saveProjectToDb(finalProj);
         }
-
-        const finalProj = { ...targetProj, members: updatedMembers };
-        const updatedProjects = projects.map(p => p.id === finalProj.id ? finalProj : p);
-        setProjects(updatedProjects);
-        setActiveProject(finalProj);
-        broadcastSync({ projects: updatedProjects });
-        dbService.saveProjectToDb(finalProj);
       }
     }
   }, [isDarkMode, currentUser]);
@@ -221,7 +314,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar
-        projects={projects}
+        projects={userProjects}
         activeProject={activeProject}
         setActiveProject={setActiveProject}
         isDarkMode={isDarkMode}
@@ -241,54 +334,96 @@ export default function App() {
       />
 
       <main style={{ flex: 1, maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '0 24px' }}>
-        <NavigationSubTabs activeTab={activeTab} setActiveTab={handleSelectTab} unreadCounts={unreadCounts} />
-
-        {activeTab === 'global' && (
-          <GlobalDashboard
-            projects={projects}
-            events={events}
-            checkins={checkins}
-            onSelectProject={(projId) => {
-              const target = projects.find(p => p.id === projId);
-              if (target) { setActiveProject(target); setActiveTab('overview'); }
-            }}
-            setEvents={(newEvts) => handleUpdateEvents(newEvts)}
-          />
-        )}
-
-        {activeTab !== 'global' && (
-          activeProject ? (
-            <>
-              {activeTab === 'overview' && (
-                <ProjectDashboard
-                  activeProject={activeProject}
-                  onSelectTab={setActiveTab}
-                  messages={messages}
-                  todos={todos}
-                  chatMessages={chatMessages}
-                  events={events}
-                  files={files}
-                  checkins={checkins}
-                  onOpenTeamModal={() => setShowTeamModal(true)}
-                  activities={activities}
-                />
-              )}
-              {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-              {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} projects={projects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-              {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} currentUser={currentUser} />}
-              {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-              {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-              {activeTab === 'standups' && <AutomaticCheckins checkins={checkins} setCheckins={handleUpdateCheckins} activeProject={activeProject} currentUser={currentUser} />}
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Belum ada Proyek Aktif</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Buat proyek baru untuk memulai kolaborasi.</p>
-              <button className="btn btn-primary" onClick={() => setShowNewProjectModal(true)}>
-                <Plus size={16} /> Buat Proyek Baru
-              </button>
+        {!currentUser ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '60px 24px', margin: '40px auto', maxWidth: '540px' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'var(--g-blue-light)',
+              color: 'var(--g-blue)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px auto'
+            }}>
+              <Lock size={32} />
             </div>
-          )
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '12px' }}>Akses Terkunci — Login Diperlukan</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '28px' }}>
+              Anda belum masuk ke sistem. Silakan login menggunakan akun Google atau email Anda untuk melihat dan mengelola proyek tim secara aman.
+            </p>
+            <button className="btn btn-primary" onClick={() => setShowLoginModal(true)} style={{ padding: '10px 24px', fontSize: '0.95rem', fontWeight: 700, gap: '8px' }}>
+              <LogIn size={18} /> Masuk Akun Sekarang
+            </button>
+          </div>
+        ) : (
+          <>
+            <NavigationSubTabs activeTab={activeTab} setActiveTab={handleSelectTab} unreadCounts={unreadCounts} />
+
+            {activeTab === 'global' && (
+              <GlobalDashboard
+                projects={userProjects}
+                events={events}
+                checkins={checkins}
+                onSelectProject={(projId) => {
+                  const target = userProjects.find(p => p.id === projId);
+                  if (target) { setActiveProject(target); setActiveTab('overview'); }
+                }}
+                setEvents={(newEvts) => handleUpdateEvents(newEvts)}
+              />
+            )}
+
+            {activeTab !== 'global' && (
+              (activeProject && isUserMemberOfProject(activeProject, currentUser)) ? (
+                <>
+                  {activeTab === 'overview' && (
+                    <ProjectDashboard
+                      activeProject={activeProject}
+                      onSelectTab={setActiveTab}
+                      messages={messages}
+                      todos={todos}
+                      chatMessages={chatMessages}
+                      events={events}
+                      files={files}
+                      checkins={checkins}
+                      onOpenTeamModal={() => setShowTeamModal(true)}
+                      activities={activities}
+                    />
+                  )}
+                  {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} projects={userProjects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} currentUser={currentUser} />}
+                  {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'standups' && <AutomaticCheckins checkins={checkins} setCheckins={handleUpdateCheckins} activeProject={activeProject} currentUser={currentUser} />}
+                </>
+              ) : (
+                <div className="glass-card" style={{ textAlign: 'center', padding: '60px 24px', margin: '40px auto', maxWidth: '540px' }}>
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(234, 67, 53, 0.1)',
+                    color: '#ea4335',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px auto'
+                  }}>
+                    <Lock size={32} />
+                  </div>
+                  <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '12px' }}>Akses Proyek Dibatasi</h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '24px' }}>
+                    Akun Anda (<strong>{currentUser.email}</strong>) tidak memiliki hak akses ke proyek ini, atau Anda belum diundang ke proyek manapun.
+                  </p>
+                  <button className="btn btn-primary" onClick={() => setShowNewProjectModal(true)}>
+                    <Plus size={16} /> Buat Proyek Baru
+                  </button>
+                </div>
+              )
+            )}
+          </>
         )}
       </main>
 

@@ -225,7 +225,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
 
           {/* Messages Stream */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '8px' }}>
-            {chatMessages.filter(msg => (!msg.projectId || msg.projectId === activeProject?.id) && (!msg.channel || msg.channel === activeChannel)).map(msg => (
+            {chatMessages.filter(msg => msg.projectId === activeProject?.id && (!msg.channel || msg.channel === activeChannel)).map(msg => (
               <div key={msg.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <img 
                   src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender || 'User')}&background=0D8ABC&color=fff&bold=true`} 

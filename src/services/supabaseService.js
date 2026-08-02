@@ -156,9 +156,11 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
     name: fileItem.name,
     size: fileItem.size,
     type: fileItem.type,
+    source: fileItem.source || 'Google Drive',
     uploader: fileItem.uploader || fileItem.author || 'User',
     author: fileItem.author || fileItem.uploader || 'User',
-    date: fileItem.date || 'Hari ini',
+    date: fileItem.date || fileItem.updatedAt || 'Hari ini',
+    updatedAt: fileItem.updatedAt || fileItem.date || 'Hari ini',
     url: fileItem.url
   };
   return await runQuery(supabase.from('files').upsert(row));
@@ -185,7 +187,8 @@ export const saveEventToDb = async (eventItem, isDelete = false) => {
     location: eventItem.location || 'Google Meet',
     assignee: eventItem.assignee || 'Semua Anggota Tim',
     color: eventItem.color || '#1a73e8',
-    completed: Boolean(eventItem.completed)
+    completed: Boolean(eventItem.completed),
+    syncGoogleCalendar: Boolean(eventItem.syncGoogleCalendar)
   };
   return await runQuery(supabase.from('events').upsert(row));
 };
@@ -228,6 +231,7 @@ export const fetchActivitiesFromDb = async () => {
 export const saveActivityToDb = async (activityItem) => {
   const row = {
     id: activityItem.id,
+    projectId: activityItem.projectId,
     user: activityItem.user,
     action: activityItem.action,
     time: activityItem.time,

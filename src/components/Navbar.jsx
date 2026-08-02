@@ -104,9 +104,9 @@ export default function Navbar({
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                background: activeProject?.color || 'var(--g-blue)'
+                background: activeProject?.color || (currentUser ? 'var(--g-blue)' : 'var(--text-muted)')
               }} />
-              <span>{activeProject?.name || 'Pilih Proyek'}</span>
+              <span>{currentUser ? (activeProject?.name || 'Pilih Proyek') : 'Login Diperlukan'}</span>
               <ChevronDown size={14} color="var(--text-secondary)" />
             </button>
 
@@ -128,67 +128,91 @@ export default function Navbar({
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', padding: '6px 8px' }}>
                   DAFTAR PROYEK AKTIF
                 </div>
-                {projects.map(proj => (
-                  <button
-                    key={proj.id}
-                    onClick={() => {
-                      setActiveProject(proj);
-                      setShowDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 10px',
-                      borderRadius: 'var(--radius-sm)',
-                      background: activeProject?.id === proj.id ? 'var(--g-blue-light)' : 'transparent',
-                      color: activeProject?.id === proj.id ? 'var(--g-blue)' : 'var(--text-primary)',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: activeProject?.id === proj.id ? 700 : 500,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <span style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: proj.color || 'var(--g-blue)'
-                    }} />
-                    <div>
-                      <div>{proj.name}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>{proj.category}</div>
-                    </div>
-                  </button>
-                ))}
 
-                <div style={{ borderTop: '1px solid var(--border-color)', margin: '6px 0' }} />
+                {!currentUser ? (
+                  <div style={{ padding: '12px 8px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Silakan login untuk mengakses proyek Anda.
+                    </p>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={() => { setShowDropdown(false); onOpenLoginModal(); }}
+                      style={{ fontSize: '0.75rem', padding: '4px 10px', width: '100%' }}
+                    >
+                      Masuk Akun Sekarang
+                    </button>
+                  </div>
+                ) : projects.length === 0 ? (
+                  <div style={{ padding: '12px 8px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Tidak ada proyek yang terhubung dengan email {currentUser.email}
+                  </div>
+                ) : (
+                  projects.map(proj => (
+                    <button
+                      key={proj.id}
+                      onClick={() => {
+                        setActiveProject(proj);
+                        setShowDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: activeProject?.id === proj.id ? 'var(--g-blue-light)' : 'transparent',
+                        color: activeProject?.id === proj.id ? 'var(--g-blue)' : 'var(--text-primary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: activeProject?.id === proj.id ? 700 : 500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: proj.color || 'var(--g-blue)'
+                      }} />
+                      <div>
+                        <div>{proj.name}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>{proj.category}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
 
-                <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    onNewProject();
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'transparent',
-                    color: 'var(--g-blue)',
-                    border: '1px dashed var(--g-blue)',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <Plus size={14} /> Buat Proyek Baru
-                </button>
+                {currentUser && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--border-color)', margin: '6px 0' }} />
+
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false);
+                        onNewProject();
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'transparent',
+                        color: 'var(--g-blue)',
+                        border: '1px dashed var(--g-blue)',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={14} /> Buat Proyek Baru
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

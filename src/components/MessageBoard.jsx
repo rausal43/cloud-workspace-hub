@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageSquare, Pin, Plus, Search, MessageCircle, User, Calendar, Tag, Edit3, Trash2, Settings, Check } from 'lucide-react';
 import { useLocalStorageState } from '../hooks/useLocalStorage';
 
@@ -27,7 +27,7 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
   const [commentText, setCommentText] = useState('');
 
   const filteredMessages = messages.filter(msg => {
-    const matchesProj = !msg.projectId || msg.projectId === activeProject?.id;
+    const matchesProj = msg.projectId === activeProject?.id;
     const matchesCat = selectedCategory === 'Semua' || msg.category === selectedCategory;
     const matchesSearch = msg.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           msg.content.toLowerCase().includes(searchQuery.toLowerCase());
@@ -146,24 +146,36 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
     if (selectedCategory === catToDelete) setSelectedCategory('Semua');
   };
 
+  useEffect(() => {
+    if (activeMessageDetail) {
+      const updated = messages.find(m => m.id === activeMessageDetail.id);
+      if (updated) {
+        setActiveMessageDetail(updated);
+      }
+    }
+  }, [messages]);
+
   const handleAddComment = (msgId) => {
     if (!commentText.trim()) return;
+    const authorNameResolved = currentUser?.name || postAuthor || defaultAuthor;
+    const commentAvatar = currentUser ? currentUser.avatar : authorAvatar;
     const newComment = {
       id: `c-${Date.now()}`,
-      author: authorName,
-      avatar: authorAvatar,
+      author: authorNameResolved,
+      avatar: commentAvatar,
       time: 'Baru saja',
-      text: commentText
+      text: commentText.trim()
     };
 
     let targetUpdated = null;
     const updated = messages.map(m => {
       if (m.id === msgId) {
         const comments = m.comments || [];
+        const newComments = [...comments, newComment];
         targetUpdated = {
           ...m,
-          commentsCount: (m.commentsCount || 0) + 1,
-          comments: [...comments, newComment]
+          commentsCount: newComments.length,
+          comments: newComments
         };
         return targetUpdated;
       }
@@ -177,6 +189,7 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
     }
 
     setCommentText('');
+    notify?.('Komentar berhasil ditambahkan!', 'success');
   };
 
   const handleDeleteComment = (msgId, commentId) => {
@@ -186,7 +199,7 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
         const updatedComments = (m.comments || []).filter(c => c.id !== commentId);
         targetUpdated = {
           ...m,
-          commentsCount: Math.max(0, (m.commentsCount || 1) - 1),
+          commentsCount: updatedComments.length,
           comments: updatedComments
         };
         return targetUpdated;

@@ -19,25 +19,47 @@ export default function GlobalDashboard({ projects, events, checkins, onSelectPr
     setEvents(updated);
   };
 
-  // Aggregate all events across all projects
+  const allowedProjectIds = new Set((projects || []).map(p => p.id));
+  const allowedProjectNames = new Set((projects || []).map(p => p.name?.toLowerCase()).filter(Boolean));
+
+  const isItemInUserProjects = (itemProjId) => {
+    if (!projects || projects.length === 0) return false;
+    if (!itemProjId) return true; // Items without explicit projectId belong to workspace
+    if (allowedProjectIds.has(itemProjId)) return true;
+    if (allowedProjectNames.has(String(itemProjId).toLowerCase())) return true;
+    return false;
+  };
+
+  const getProjectInfo = (projId) => {
+    if (!projId) return projects[0] || { id: 'p1', name: 'Proyek Utama', color: '#1a73e8' };
+    const found = projects.find(p => p.id === projId || (p.name && p.name.toLowerCase() === String(projId).toLowerCase()));
+    return found || projects[0] || { id: 'p1', name: 'Proyek Utama', color: '#1a73e8' };
+  };
+
+  // Aggregate all events across allowed projects
   const allEvents = events.filter(evt => {
-    const matchesProject = selectedFilterProjectId === 'ALL' || evt.projectId === selectedFilterProjectId;
+    const isAllowed = isItemInUserProjects(evt.projectId);
+    const selectedProj = projects.find(p => p.id === selectedFilterProjectId);
+    const matchesProject = selectedFilterProjectId === 'ALL'
+      ? isAllowed
+      : (evt.projectId === selectedFilterProjectId || 
+         (evt.projectId && selectedProj && String(evt.projectId).toLowerCase() === selectedProj.name?.toLowerCase()) ||
+         (!evt.projectId && projects[0]?.id === selectedFilterProjectId));
     const matchesHide = !hideCompletedGlobal || !evt.completed;
     return matchesProject && matchesHide;
   });
 
-  const completedCount = events.filter(e => e.completed).length;
+  const completedCount = allEvents.filter(e => e.completed).length;
 
-  // Aggregate all checkins across all projects
+  // Aggregate all checkins across allowed projects
   const allCheckins = checkins.filter(chk => {
-    if (selectedFilterProjectId === 'ALL') return true;
-    return chk.projectId === selectedFilterProjectId;
+    const isAllowed = isItemInUserProjects(chk.projectId);
+    const selectedProj = projects.find(p => p.id === selectedFilterProjectId);
+    if (selectedFilterProjectId === 'ALL') return isAllowed;
+    return chk.projectId === selectedFilterProjectId || 
+           (chk.projectId && selectedProj && String(chk.projectId).toLowerCase() === selectedProj.name?.toLowerCase()) ||
+           (!chk.projectId && projects[0]?.id === selectedFilterProjectId);
   });
-
-  const getProjectInfo = (projId) => {
-    const found = projects.find(p => p.id === projId);
-    return found || { name: 'Proyek Utama', color: '#1a73e8' };
-  };
 
   // Count total status responses across checkins
   let totalResponses = 0;
@@ -140,7 +162,6 @@ export default function GlobalDashboard({ projects, events, checkins, onSelectPr
           </h2>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            {/* Hide / Show Completed Button */}
             <button
               className="btn btn-secondary"
               onClick={() => setHideCompletedGlobal(!hideCompletedGlobal)}
@@ -160,102 +181,109 @@ export default function GlobalDashboard({ projects, events, checkins, onSelectPr
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
-          {allEvents.map(evt => {
-            const proj = getProjectInfo(evt.projectId);
-            const cardColor = evt.color || proj.color || '#1a73e8';
-            const isDone = !!evt.completed;
+        {allEvents.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+            {allEvents.map(evt => {
+              const proj = getProjectInfo(evt.projectId);
+              const cardColor = evt.color || proj.color || '#1a73e8';
+              const isDone = !!evt.completed;
 
-            return (
-              <div
-                key={evt.id}
-                className="glass-card"
-                style={{
-                  padding: '18px',
-                  borderLeft: `5px solid ${isDone ? 'var(--g-green)' : cardColor}`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justify: 'space-between',
-                  opacity: isDone ? 0.75 : 1,
-                  background: isDone ? 'var(--bg-surface-hover)' : 'var(--bg-glass)'
-                }}
-              >
-                <div>
-                  {/* Project Tag Badge & Completion Checkbox */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        className="btn-icon"
-                        onClick={(e) => toggleEventCompleted(evt.id, e)}
-                        title={isDone ? 'Tandai Belum Selesai' : 'Tandai Selesai'}
-                        style={{ padding: '2px' }}
-                      >
-                        {isDone ? <CheckSquare size={18} color="var(--g-green)" /> : <Square size={18} color="var(--text-muted)" />}
-                      </button>
+              return (
+                <div
+                  key={evt.id}
+                  className="glass-card"
+                  style={{
+                    padding: '18px',
+                    borderLeft: `5px solid ${isDone ? 'var(--g-green)' : cardColor}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between',
+                    opacity: isDone ? 0.75 : 1,
+                    background: isDone ? 'var(--bg-surface-hover)' : 'var(--bg-glass)'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          className="btn-icon"
+                          onClick={(e) => toggleEventCompleted(evt.id, e)}
+                          title={isDone ? 'Tandai Belum Selesai' : 'Tandai Selesai'}
+                          style={{ padding: '2px' }}
+                        >
+                          {isDone ? <CheckSquare size={18} color="var(--g-green)" /> : <Square size={18} color="var(--text-muted)" />}
+                        </button>
 
-                      <button
-                        className="btn"
-                        onClick={() => onSelectProject(proj.id)}
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '0.72rem',
-                          borderRadius: '12px',
-                          background: `${proj.color || '#1a73e8'}18`,
-                          color: proj.color || '#1a73e8',
-                          fontWeight: 700,
-                          border: 'none',
-                          cursor: 'pointer'
-                        }}
-                        title="Buka Proyek Ini"
-                      >
-                        📁 {proj.name}
-                      </button>
+                        <button
+                          className="btn"
+                          onClick={() => onSelectProject(proj.id)}
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '0.72rem',
+                            borderRadius: '12px',
+                            background: `${proj.color || '#1a73e8'}18`,
+                            color: proj.color || '#1a73e8',
+                            fontWeight: 700,
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                          title="Buka Proyek Ini"
+                        >
+                          📁 {proj.name}
+                        </button>
+                      </div>
+
+                      <span className="badge" style={{ background: isDone ? 'var(--g-green-light)' : `${cardColor}18`, color: isDone ? 'var(--g-green)' : cardColor, fontSize: '0.7rem' }}>
+                        {isDone ? '✓ Selesai' : evt.date}
+                      </span>
                     </div>
 
-                    <span className="badge" style={{ background: isDone ? 'var(--g-green-light)' : `${cardColor}18`, color: isDone ? 'var(--g-green)' : cardColor, fontSize: '0.7rem' }}>
-                      {isDone ? '✓ Selesai' : evt.date}
-                    </span>
+                    <h3 style={{
+                      fontSize: '1.05rem',
+                      fontWeight: 700,
+                      marginBottom: '8px',
+                      textDecoration: isDone ? 'line-through' : 'none',
+                      color: isDone ? 'var(--text-muted)' : 'var(--text-primary)'
+                    }}>
+                      {evt.title}
+                    </h3>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={13} color={isDone ? 'var(--text-muted)' : cardColor} /> {evt.time}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={13} color="var(--text-muted)" /> {evt.location}
+                      </div>
+                    </div>
                   </div>
 
-                  <h3 style={{
-                    fontSize: '1.05rem',
-                    fontWeight: 700,
-                    marginBottom: '8px',
-                    textDecoration: isDone ? 'line-through' : 'none',
-                    color: isDone ? 'var(--text-muted)' : 'var(--text-primary)'
-                  }}>
-                    {evt.title}
-                  </h3>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
+                    {evt.syncGoogleCalendar ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--g-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <CheckCircle size={11} /> Google Calendar
+                      </span>
+                    ) : <div />}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={13} color={isDone ? 'var(--text-muted)' : cardColor} /> {evt.time}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MapPin size={13} color="var(--text-muted)" /> {evt.location}
-                    </div>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => onSelectProject(proj.id)}
+                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                    >
+                      Buka Proyek <ArrowRight size={11} />
+                    </button>
                   </div>
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
-                  {evt.syncGoogleCalendar ? (
-                    <span style={{ fontSize: '0.72rem', color: 'var(--g-green)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <CheckCircle size={11} /> Google Calendar
-                    </span>
-                  ) : <div />}
-
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => onSelectProject(proj.id)}
-                    style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-                  >
-                    Buka Proyek <ArrowRight size={11} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="glass-card" style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <CalendarIcon size={38} color="var(--g-blue)" style={{ marginBottom: '10px', opacity: 0.7 }} />
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Belum Ada Agenda atau Milestone</h4>
+            <p style={{ fontSize: '0.85rem' }}>Jadwal kalender dari proyek-proyek Anda akan secara otomatis tampil terpusat di sini.</p>
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: UNIFIED GLOBAL STANDUPS FEED */}
@@ -269,64 +297,70 @@ export default function GlobalDashboard({ projects, events, checkins, onSelectPr
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {allCheckins.map(chk => {
-            const proj = getProjectInfo(chk.projectId);
+        {allCheckins.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {allCheckins.map(chk => {
+              const proj = getProjectInfo(chk.projectId);
 
-            return (
-              <div key={chk.id} className="glass-card" style={{ padding: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    {/* Project Tag Badge */}
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      background: `${proj.color || '#1a73e8'}18`,
-                      color: proj.color || '#1a73e8',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      marginBottom: '4px'
-                    }}>
-                      📁 Proyek: {proj.name}
+              return (
+                <div key={chk.id} className="glass-card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        background: `${proj.color || '#1a73e8'}18`,
+                        color: proj.color || '#1a73e8',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        marginBottom: '4px'
+                      }}>
+                        📁 Proyek: {proj.name}
+                      </span>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{chk.question}</h3>
+                    </div>
+
+                    <span className="badge badge-yellow" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem' }}>
+                      <Clock size={11} /> {chk.schedule}
                     </span>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{chk.question}</h3>
                   </div>
 
-                  <span className="badge badge-yellow" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem' }}>
-                    <Clock size={11} /> {chk.schedule}
-                  </span>
-                </div>
-
-                {/* Responses List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(chk.responses || []).map((resp, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        gap: '12px',
-                        background: 'var(--bg-surface)',
-                        padding: '12px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)'
-                      }}
-                    >
-                      <img src={resp.avatar} alt={resp.author} className="avatar" style={{ width: '32px', height: '32px' }} />
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{resp.author}</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{resp.time}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {(chk.responses || []).map((resp, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          gap: '12px',
+                          background: 'var(--bg-surface)',
+                          padding: '12px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)'
+                        }}
+                      >
+                        <img src={resp.avatar} alt={resp.author} className="avatar" style={{ width: '32px', height: '32px' }} />
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{resp.author}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{resp.time}</span>
+                          </div>
+                          <p style={{ fontSize: '0.88rem' }}>{resp.answer}</p>
                         </div>
-                        <p style={{ fontSize: '0.88rem' }}>{resp.answer}</p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="glass-card" style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <HelpCircle size={38} color="var(--g-red)" style={{ marginBottom: '10px', opacity: 0.7 }} />
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>Belum Ada Laporan Status Standup</h4>
+            <p style={{ fontSize: '0.85rem' }}>Jawaban laporan status harian dari tim Anda akan secara otomatis tampil terpadu di sini.</p>
+          </div>
+        )}
       </div>
     </div>
   );
