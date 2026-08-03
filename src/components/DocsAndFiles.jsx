@@ -204,7 +204,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
                   {file.name}
                 </h4>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                  {file.size} • Diunggah oleh {file.author}
+                  {file.size} • Diunggah oleh {file.uploader || file.author || 'User'}
                 </div>
               </div>
 

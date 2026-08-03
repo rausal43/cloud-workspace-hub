@@ -153,30 +153,38 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
 
   // Ensure url string is safe for Supabase HTTP payload limits
   let safeUrl = fileItem.url || 'https://drive.google.com';
-  if (safeUrl.startsWith('data:') && safeUrl.length > 200000) {
+  if (safeUrl.startsWith('data:') && safeUrl.length > 100000) {
     safeUrl = `https://drive.google.com/file/preview?name=${encodeURIComponent(fileItem.name || 'document')}`;
   }
 
-  const row = {
+  const displayUploader = fileItem.uploader || fileItem.author || 'User';
+
+  // Base row matching core guaranteed Supabase columns
+  const baseRow = {
     id: fileItem.id,
     projectId: fileItem.projectId,
     name: fileItem.name,
     size: fileItem.size,
     type: fileItem.type,
-    source: fileItem.source || 'Google Drive',
-    uploader: fileItem.uploader || fileItem.author || 'User',
-    author: fileItem.author || fileItem.uploader || 'User',
+    uploader: displayUploader,
+    author: displayUploader,
     date: fileItem.date || fileItem.updatedAt || 'Hari ini',
-    updatedAt: fileItem.updatedAt || fileItem.date || 'Hari ini',
     url: safeUrl
   };
 
-  const result = await runQuery(supabase.from('files').upsert(row));
-  if (result.error && fileItem.url && fileItem.url.startsWith('data:')) {
-    row.url = 'https://drive.google.com';
-    return await runQuery(supabase.from('files').upsert(row));
+  // Extended row with source and updatedAt
+  const fullRow = {
+    ...baseRow,
+    source: fileItem.source || 'Google Drive',
+    updatedAt: fileItem.updatedAt || fileItem.date || 'Hari ini'
+  };
+
+  const res = await runQuery(supabase.from('files').upsert(fullRow));
+  if (res.error) {
+    // Retry with base columns if schema cache rejected optional columns
+    return await runQuery(supabase.from('files').upsert(baseRow));
   }
-  return result;
+  return res;
 };
 
 // ==========================================
