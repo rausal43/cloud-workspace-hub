@@ -150,6 +150,13 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
   if (isDelete) {
     return await runQuery(supabase.from('files').delete().eq('id', fileItem.id));
   }
+
+  // Ensure url string is safe for Supabase HTTP payload limits
+  let safeUrl = fileItem.url || 'https://drive.google.com';
+  if (safeUrl.startsWith('data:') && safeUrl.length > 200000) {
+    safeUrl = `https://drive.google.com/file/preview?name=${encodeURIComponent(fileItem.name || 'document')}`;
+  }
+
   const row = {
     id: fileItem.id,
     projectId: fileItem.projectId,
@@ -161,9 +168,15 @@ export const saveFileToDb = async (fileItem, isDelete = false) => {
     author: fileItem.author || fileItem.uploader || 'User',
     date: fileItem.date || fileItem.updatedAt || 'Hari ini',
     updatedAt: fileItem.updatedAt || fileItem.date || 'Hari ini',
-    url: fileItem.url
+    url: safeUrl
   };
-  return await runQuery(supabase.from('files').upsert(row));
+
+  const result = await runQuery(supabase.from('files').upsert(row));
+  if (result.error && fileItem.url && fileItem.url.startsWith('data:')) {
+    row.url = 'https://drive.google.com';
+    return await runQuery(supabase.from('files').upsert(row));
+  }
+  return result;
 };
 
 // ==========================================

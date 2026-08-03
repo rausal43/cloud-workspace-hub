@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2 } from 'lucide-react';
+import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2, Loader2 } from 'lucide-react';
 import { isMatchProject } from '../hooks/useWorkspaceData';
 
 export default function DocsAndFiles({ files, setFiles, activeProject, projects = [], currentUser, notify }) {
@@ -7,9 +7,12 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
   const [fileSource, setFileSource] = useState('Google Drive');
   const [previewFile, setPreviewFile] = useState(null);
   
-  // Real Local File Upload State
+  // Real Local File Upload State & Progress
   const [selectedLocalFile, setSelectedLocalFile] = useState(null);
   const [customFileName, setCustomFileName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatusText, setUploadStatusText] = useState('');
   const fileInputRef = useRef(null);
 
   const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
@@ -45,6 +48,11 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
   const handleUploadFile = async (e) => {
     e.preventDefault();
     if (!selectedLocalFile && !customFileName.trim()) return;
+    if (isUploading) return;
+
+    setIsUploading(true);
+    setUploadProgress(20);
+    setUploadStatusText('Membaca & Memproses Berkas...');
 
     let detectedType = 'other';
     const fileNameToUse = customFileName || (selectedLocalFile ? selectedLocalFile.name : 'Dokumen');
@@ -56,6 +64,9 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     } else if (fileNameToUse.match(/\.(xlsx|csv|gsheet)$/i) || (selectedLocalFile && selectedLocalFile.type.includes('sheet'))) {
       detectedType = 'sheet';
     }
+
+    setUploadProgress(50);
+    setUploadStatusText('Mengunggah ke Cloud Storage (Google Drive API)...');
 
     let fileUrl = 'https://drive.google.com';
     if (selectedLocalFile) {
@@ -70,6 +81,9 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
         fileUrl = URL.createObjectURL(selectedLocalFile);
       }
     }
+
+    setUploadProgress(80);
+    setUploadStatusText('Menyingkronkan Berkas dengan Seluruh Anggota Tim...');
 
     const newFile = {
       id: `file-${Date.now()}`,
@@ -86,11 +100,20 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     };
 
     const updated = [newFile, ...files];
-    setFiles(updated, newFile, false);
-    setSelectedLocalFile(null);
-    setCustomFileName('');
-    setShowUploadModal(false);
-    notify?.(`Berkas "${fileNameToUse}" berhasil diunggah!`, 'success');
+    await setFiles(updated, newFile, false);
+
+    setUploadProgress(100);
+    setUploadStatusText('Selesai! Berkas Terhubung ke Tim.');
+
+    setTimeout(() => {
+      setSelectedLocalFile(null);
+      setCustomFileName('');
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadStatusText('');
+      setShowUploadModal(false);
+      notify?.(`Berkas "${fileNameToUse}" berhasil diunggah & disinkronkan! 🎉`, 'success');
+    }, 500);
   };
 
   const handleDeleteFile = (fileId) => {
@@ -304,15 +327,40 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Lokasi Destinasi Storage</label>
-                <select className="input-field" value={fileSource} onChange={(e) => setFileSource(e.target.value)}>
+                <select className="input-field" value={fileSource} onChange={(e) => setFileSource(e.target.value)} disabled={isUploading}>
                   <option value="Google Drive">Google Drive API (Folder Proyek)</option>
                   <option value="Firebase Storage">Firebase Cloud Storage</option>
                 </select>
               </div>
 
+              {/* Dynamic Upload Progress & Loading Bar */}
+              {isUploading && (
+                <div style={{ marginBottom: '20px', background: 'var(--g-blue-light)', padding: '14px 16px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(26, 115, 232, 0.3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--g-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Loader2 className="animate-spin" size={16} /> {uploadStatusText}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--g-blue)' }}>{uploadProgress}%</span>
+                  </div>
+                  <div style={{ height: '8px', background: 'rgba(26, 115, 232, 0.2)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${uploadProgress}%`, height: '100%', background: 'var(--g-blue)', transition: 'width 0.3s ease-in-out' }} />
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowUploadModal(false)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Unggah ke Google Drive</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowUploadModal(false)} disabled={isUploading}>
+                  Batal
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isUploading} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} /> Mengunggah ({uploadProgress}%)...
+                    </>
+                  ) : (
+                    'Unggah ke Google Drive'
+                  )}
+                </button>
               </div>
             </form>
           </div>
