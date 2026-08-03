@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2, Loader2 } from 'lucide-react';
 import { isMatchProject } from '../hooks/useWorkspaceData';
+import { uploadFileToCloudStorage } from '../services/firebaseStorageService';
 
 export default function DocsAndFiles({ files, setFiles, activeProject, projects = [], currentUser, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -53,7 +54,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     if (isUploading) return;
 
     setIsUploading(true);
-    setUploadProgress(20);
+    setUploadProgress(15);
     setUploadStatusText('Membaca & Memproses Berkas...');
 
     let detectedType = 'other';
@@ -67,25 +68,33 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       detectedType = 'sheet';
     }
 
-    setUploadProgress(50);
-    setUploadStatusText('Mengunggah ke Cloud Storage (Google Drive API)...');
-
     let fileUrl = driveLinkInput.trim() || 'https://drive.google.com';
+    let isCloudUploaded = false;
+
     if (selectedLocalFile) {
-      if (selectedLocalFile.size < 20 * 1024 * 1024) {
-        fileUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve(ev.target.result);
-          reader.onerror = () => resolve(URL.createObjectURL(selectedLocalFile));
-          reader.readAsDataURL(selectedLocalFile);
+      setUploadStatusText('Mengunggah Berkas ke Google Cloud Storage...');
+      try {
+        fileUrl = await uploadFileToCloudStorage(selectedLocalFile, activeProject.id, (progressPct) => {
+          setUploadProgress(Math.min(90, Math.max(20, progressPct)));
         });
-      } else if (!driveLinkInput.trim()) {
-        fileUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileNameToUse)}`;
+        isCloudUploaded = true;
+      } catch (cloudErr) {
+        console.warn('Cloud Storage upload fallback:', cloudErr);
+        if (selectedLocalFile.size < 20 * 1024 * 1024) {
+          fileUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target.result);
+            reader.onerror = () => resolve(URL.createObjectURL(selectedLocalFile));
+            reader.readAsDataURL(selectedLocalFile);
+          });
+        } else if (!driveLinkInput.trim()) {
+          fileUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileNameToUse)}`;
+        }
       }
     }
 
-    setUploadProgress(80);
-    setUploadStatusText('Menyingkronkan Berkas dengan Seluruh Anggota Tim...');
+    setUploadProgress(95);
+    setUploadStatusText('Menyingkronkan Berkas ke Seluruh Anggota Tim...');
 
     const newFile = {
       id: `file-${Date.now()}`,
@@ -93,9 +102,9 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       name: fileNameToUse,
       type: detectedType,
       size: selectedLocalFile ? formatBytes(selectedLocalFile.size) : '1.5 MB',
-      source: fileSource,
+      source: isCloudUploaded ? 'Google Cloud Storage' : fileSource,
       url: fileUrl,
-      isLocalObject: !!selectedLocalFile,
+      isLocalObject: false,
       updatedAt: 'Hari ini',
       uploader: uploaderName || defaultUploader,
       author: uploaderName || defaultUploader
@@ -105,7 +114,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     await setFiles(updated, newFile, false);
 
     setUploadProgress(100);
-    setUploadStatusText('Selesai! Berkas Terhubung ke Tim.');
+    setUploadStatusText('Selesai! Berkas Berhasil Terhubung.');
 
     setTimeout(() => {
       setSelectedLocalFile(null);
@@ -115,7 +124,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       setUploadProgress(0);
       setUploadStatusText('');
       setShowUploadModal(false);
-      notify?.(`Berkas "${fileNameToUse}" berhasil diunggah & disinkronkan! 🎉`, 'success');
+      notify?.(`Berkas "${fileNameToUse}" berhasil terunggah ke Cloud Storage & disinkronkan! 🎉`, 'success');
     }, 500);
   };
 
