@@ -10,9 +10,11 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
   // Real Local File Upload State & Progress
   const [selectedLocalFile, setSelectedLocalFile] = useState(null);
   const [customFileName, setCustomFileName] = useState('');
+  const [driveLinkInput, setDriveLinkInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatusText, setUploadStatusText] = useState('');
+  const [blobNoticeFile, setBlobNoticeFile] = useState(null);
   const fileInputRef = useRef(null);
 
   const authorName = currentUser ? currentUser.name : 'Rausal Bahtiar';
@@ -47,7 +49,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
 
   const handleUploadFile = async (e) => {
     e.preventDefault();
-    if (!selectedLocalFile && !customFileName.trim()) return;
+    if (!selectedLocalFile && !customFileName.trim() && !driveLinkInput.trim()) return;
     if (isUploading) return;
 
     setIsUploading(true);
@@ -68,17 +70,17 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     setUploadProgress(50);
     setUploadStatusText('Mengunggah ke Cloud Storage (Google Drive API)...');
 
-    let fileUrl = 'https://drive.google.com';
+    let fileUrl = driveLinkInput.trim() || 'https://drive.google.com';
     if (selectedLocalFile) {
-      if (selectedLocalFile.size < 5 * 1024 * 1024) {
+      if (selectedLocalFile.size < 20 * 1024 * 1024) {
         fileUrl = await new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve(ev.target.result);
           reader.onerror = () => resolve(URL.createObjectURL(selectedLocalFile));
           reader.readAsDataURL(selectedLocalFile);
         });
-      } else {
-        fileUrl = URL.createObjectURL(selectedLocalFile);
+      } else if (!driveLinkInput.trim()) {
+        fileUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileNameToUse)}`;
       }
     }
 
@@ -108,6 +110,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     setTimeout(() => {
       setSelectedLocalFile(null);
       setCustomFileName('');
+      setDriveLinkInput('');
       setIsUploading(false);
       setUploadProgress(0);
       setUploadStatusText('');
@@ -126,6 +129,12 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
 
   const handleDownloadFile = (file, e) => {
     if (e) e.preventDefault();
+
+    if (file.url && file.url.startsWith('blob:')) {
+      setBlobNoticeFile(file);
+      return;
+    }
+
     const safeUrl = getSafeFileUrl(file);
 
     if (safeUrl.startsWith('data:')) {
@@ -349,6 +358,21 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
               </div>
 
               <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Link Share Google Drive (Opsional untuk File Berukuran Besar)</label>
+                <input
+                  type="url"
+                  className="input-field"
+                  placeholder="https://drive.google.com/file/d/..."
+                  value={driveLinkInput}
+                  onChange={(e) => setDriveLinkInput(e.target.value)}
+                  disabled={isUploading}
+                />
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Jika file berukuran &gt;20MB (seperti video/zip), tempelkan link Google Drive yang sudah diset ke "Anyone with link".
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Pengunggah Berkas (Gmail Undangan Tim)</label>
                 <select
                   className="input-field"
@@ -408,6 +432,41 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Blob Notice Modal for Old Local Session Files */}
+      {blobNoticeFile && (
+        <div className="modal-overlay" onClick={() => setBlobNoticeFile(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+            <h3 style={{ marginBottom: '12px', fontWeight: 800, color: 'var(--g-red)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚠️ Informasi Akses Berkas Lokal
+            </h3>
+            <div style={{ background: 'var(--g-red-light)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              Berkas <strong>"{blobNoticeFile.name}"</strong> ({blobNoticeFile.size}) diunggah langsung dari perangkat memori lokal <strong>{blobNoticeFile.uploader || blobNoticeFile.author || 'User'}</strong> sebelum sistem direct-cloud aktif.
+              <br /><br />
+              Sesuai aturan keamanan peramban (Chrome/Safari), file fisik yang disimpan di memori satu perangkat tidak dapat dibaca dari perangkat lain secara langsung tanpa Link Google Drive.
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '20px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              <strong>Solusi Berbagi File:</strong><br />
+              1. Jika file berukuran &lt;20MB: Minta pengunggah mengunggah ulang file tersebut.<br />
+              2. Jika file berukuran &gt;20MB (seperti video): Upload file ke Google Drive, lalu salin & tempelkan <strong>Link Share Google Drive</strong> di menu Unggah File.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="btn btn-secondary" onClick={() => setBlobNoticeFile(null)}>Saya Mengerti</button>
+              <a
+                href={`https://drive.google.com/drive/search?q=${encodeURIComponent(blobNoticeFile.name || '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{ textDecoration: 'none' }}
+              >
+                Cari di Google Drive
+              </a>
+            </div>
           </div>
         </div>
       )}
