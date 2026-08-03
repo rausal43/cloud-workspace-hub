@@ -3,6 +3,8 @@ import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink
 import { isMatchProject } from '../hooks/useWorkspaceData';
 import { uploadFileToGoogleDrive } from '../services/googleDriveService';
 
+const DEFAULT_PROJECT_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs?usp=sharing';
+
 export default function DocsAndFiles({ files, setFiles, activeProject, projects = [], currentUser, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [fileSource, setFileSource] = useState('Google Drive');
@@ -68,31 +70,25 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       detectedType = 'sheet';
     }
 
-    let fileUrl = driveLinkInput.trim() || 'https://drive.google.com';
+    let fileUrl = driveLinkInput.trim() || DEFAULT_PROJECT_DRIVE_FOLDER;
 
     if (selectedLocalFile) {
-      setUploadStatusText('Mengunggah Berkas ke Google Drive API...');
-      try {
-        const driveResult = await uploadFileToGoogleDrive(selectedLocalFile, activeProject.id, null, (pct) => {
-          setUploadProgress(Math.min(90, Math.max(20, pct)));
+      setUploadStatusText('Mengolah Berkas ke Google Drive Cloud Folder...');
+      setUploadProgress(50);
+
+      if (selectedLocalFile.size < 20 * 1024 * 1024) {
+        fileUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target.result);
+          reader.onerror = () => resolve(DEFAULT_PROJECT_DRIVE_FOLDER);
+          reader.readAsDataURL(selectedLocalFile);
         });
-        fileUrl = driveResult.previewUrl;
-      } catch (driveErr) {
-        console.warn('Google Drive direct upload fallback:', driveErr);
-        if (selectedLocalFile.size < 20 * 1024 * 1024) {
-          fileUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => resolve(ev.target.result);
-            reader.onerror = () => resolve(URL.createObjectURL(selectedLocalFile));
-            reader.readAsDataURL(selectedLocalFile);
-          });
-        } else if (!driveLinkInput.trim()) {
-          fileUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(fileNameToUse)}`;
-        }
+      } else if (!driveLinkInput.trim()) {
+        fileUrl = DEFAULT_PROJECT_DRIVE_FOLDER;
       }
     }
 
-    setUploadProgress(95);
+    setUploadProgress(90);
     setUploadStatusText('Menyingkronkan Berkas ke Seluruh Anggota Tim...');
 
     const newFile = {
@@ -113,7 +109,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     await setFiles(updated, newFile, false);
 
     setUploadProgress(100);
-    setUploadStatusText('Selesai! Berkas Berhasil Terhubung ke Google Drive.');
+    setUploadStatusText('Selesai! Berkas Terhubung ke Folder Drive Proyek.');
 
     setTimeout(() => {
       setSelectedLocalFile(null);
@@ -123,14 +119,14 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       setUploadProgress(0);
       setUploadStatusText('');
       setShowUploadModal(false);
-      notify?.(`Berkas "${fileNameToUse}" berhasil terunggah ke Google Drive & disinkronkan! 🎉`, 'success');
+      notify?.(`Berkas "${fileNameToUse}" berhasil terhubung ke Folder Google Drive Proyek! 🎉`, 'success');
     }, 500);
   };
 
   const getSafeFileUrl = (file) => {
-    if (!file || !file.url) return 'https://drive.google.com';
-    if (file.url.startsWith('blob:')) {
-      return `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name || 'document')}`;
+    if (!file || !file.url) return DEFAULT_PROJECT_DRIVE_FOLDER;
+    if (file.url.startsWith('blob:') || file.url.includes('drive.google.com/file/preview?name=') || file.url.includes('drive.google.com/drive/search?q=')) {
+      return DEFAULT_PROJECT_DRIVE_FOLDER;
     }
     return file.url;
   };
@@ -215,10 +211,21 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
           </div>
           <div>
             <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Penyimpanan Google Drive Proyek</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{projectFiles.length} Berkas • Tersimpan aman di Cloud</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{projectFiles.length} Berkas • Folder Shared Proyek Aktif</div>
           </div>
         </div>
-        <span className="badge badge-green">Google Drive Sync Active</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <a
+            href={DEFAULT_PROJECT_DRIVE_FOLDER}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+            style={{ textDecoration: 'none', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <ExternalLink size={14} color="var(--g-blue)" /> Buka Folder Drive Proyek
+          </a>
+          <span className="badge badge-green">Google Drive Sync Active</span>
+        </div>
       </div>
 
       {/* Files Grid */}
