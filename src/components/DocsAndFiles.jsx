@@ -116,6 +116,31 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     }, 500);
   };
 
+  const getSafeFileUrl = (file) => {
+    if (!file || !file.url) return 'https://drive.google.com';
+    if (file.url.startsWith('blob:')) {
+      return `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name || 'document')}`;
+    }
+    return file.url;
+  };
+
+  const handleDownloadFile = (file, e) => {
+    if (e) e.preventDefault();
+    const safeUrl = getSafeFileUrl(file);
+
+    if (safeUrl.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = safeUrl;
+      link.download = file.name || 'downloaded-file';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      notify?.(`Mengunduh berkas "${file.name}"...`, 'info');
+    } else {
+      window.open(safeUrl, '_blank');
+    }
+  };
+
   const handleDeleteFile = (fileId) => {
     const deletedItem = files.find(f => f.id === fileId) || { id: fileId };
     const remaining = files.filter(f => f.id !== fileId);
@@ -188,7 +213,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   {getFileIcon(file.type)}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{file.source}</span>
+                    <span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{file.source || 'Google Drive'}</span>
                     <button
                       className="btn-icon"
                       onClick={() => handleDeleteFile(file.id)}
@@ -216,16 +241,13 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
               >
                 <Eye size={13} /> Preview
               </button>
-              <a
-                href={file.url}
-                target={file.isLocalObject ? '_self' : '_blank'}
-                download={file.isLocalObject ? file.name : undefined}
-                rel="noreferrer"
+              <button
+                onClick={(e) => handleDownloadFile(file, e)}
                 className="btn btn-secondary"
                 style={{ fontSize: '0.75rem', padding: '4px 8px', textDecoration: 'none' }}
               >
-                <Download size={13} /> {file.isLocalObject ? 'Unduh' : 'Buka'}
-              </a>
+                <Download size={13} /> {file.url && file.url.startsWith('data:') ? 'Unduh' : 'Buka'}
+              </button>
             </div>
           </div>
         ))}
@@ -238,25 +260,48 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
         </div>
       )}
 
-      {/* Preview Modal */}
+      {/* Enhanced Preview Modal */}
       {previewFile && (
         <div className="modal-overlay" onClick={() => setPreviewFile(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginBottom: '12px', fontWeight: 800 }}>Preview Dokumen</h3>
-            <div style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', textAlign: 'center', marginBottom: '20px' }}>
-              {previewFile.type === 'image' && previewFile.url.startsWith('http') ? (
-                <img src={previewFile.url} alt={previewFile.name} style={{ maxWidth: '100%', maxHeight: '250px', borderRadius: '8px', marginBottom: '12px' }} />
-              ) : getFileIcon(previewFile.type)}
-              <h4 style={{ margin: '12px 0 6px 0', fontSize: '1.1rem' }}>{previewFile.name}</h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                File disimpan di <strong>{previewFile.source}</strong> ({previewFile.size})
-              </p>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', width: '90%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontWeight: 800, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {getFileIcon(previewFile.type)} Preview Dokumen
+              </h3>
+              <button className="btn-icon" onClick={() => setPreviewFile(null)}>✕</button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+            <div style={{ background: 'var(--bg-main)', padding: '20px', borderRadius: 'var(--radius-md)', textAlign: 'center', marginBottom: '20px', maxHeight: '400px', overflowY: 'auto' }}>
+              {previewFile.url && (previewFile.url.startsWith('data:image/') || previewFile.url.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) ? (
+                <img src={previewFile.url} alt={previewFile.name} style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginBottom: '12px', objectFit: 'contain' }} />
+              ) : previewFile.url && previewFile.url.startsWith('data:video/') ? (
+                <video src={previewFile.url} controls style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '8px', marginBottom: '12px' }} />
+              ) : previewFile.url && previewFile.url.startsWith('data:application/pdf') ? (
+                <iframe src={previewFile.url} title={previewFile.name} style={{ width: '100%', height: '300px', borderRadius: '8px', border: 'none' }} />
+              ) : (
+                <div style={{ padding: '24px 10px' }}>
+                  <HardDrive size={48} color="var(--g-blue)" style={{ marginBottom: '12px', opacity: 0.8 }} />
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '1.1rem', fontWeight: 700 }}>{previewFile.name}</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    {previewFile.size} • Diunggah di <strong>{previewFile.source || 'Google Drive'}</strong>
+                  </p>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Diunggah oleh: <strong>{previewFile.uploader || previewFile.author || 'Anggota Tim'}</strong>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
               <button className="btn btn-secondary" onClick={() => handleDeleteFile(previewFile.id)} style={{ color: 'var(--g-red)' }}>
                 <Trash2 size={14} /> Hapus File
               </button>
-              <button className="btn btn-secondary" onClick={() => setPreviewFile(null)}>Tutup</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn btn-secondary" onClick={() => setPreviewFile(null)}>Tutup</button>
+                <button className="btn btn-primary" onClick={(e) => handleDownloadFile(previewFile, e)}>
+                  <Download size={14} /> {previewFile.url && previewFile.url.startsWith('data:') ? 'Unduh Berkas' : 'Buka di Google Drive'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
