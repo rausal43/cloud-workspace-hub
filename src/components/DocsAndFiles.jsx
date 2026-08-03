@@ -56,7 +56,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     if (isUploading) return;
 
     setIsUploading(true);
-    setUploadProgress(15);
+    setUploadProgress(20);
     setUploadStatusText('Membaca & Memproses Berkas...');
 
     let detectedType = 'other';
@@ -71,20 +71,23 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     }
 
     let fileUrl = driveLinkInput.trim() || DEFAULT_PROJECT_DRIVE_FOLDER;
+    let isDirectDataStored = false;
 
     if (selectedLocalFile) {
-      setUploadStatusText('Mengolah Berkas ke Google Drive Cloud Folder...');
-      setUploadProgress(50);
-
       if (selectedLocalFile.size < 20 * 1024 * 1024) {
+        setUploadStatusText('Mengonversi & Menyimpan ke Cloud Database Tim...');
+        setUploadProgress(60);
         fileUrl = await new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve(ev.target.result);
           reader.onerror = () => resolve(DEFAULT_PROJECT_DRIVE_FOLDER);
           reader.readAsDataURL(selectedLocalFile);
         });
-      } else if (!driveLinkInput.trim()) {
-        fileUrl = DEFAULT_PROJECT_DRIVE_FOLDER;
+        isDirectDataStored = true;
+      } else {
+        setUploadStatusText('Menghubungkan ke Folder Google Drive Proyek...');
+        setUploadProgress(70);
+        fileUrl = driveLinkInput.trim() || DEFAULT_PROJECT_DRIVE_FOLDER;
       }
     }
 
@@ -97,7 +100,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       name: fileNameToUse,
       type: detectedType,
       size: selectedLocalFile ? formatBytes(selectedLocalFile.size) : '1.5 MB',
-      source: 'Google Drive',
+      source: isDirectDataStored ? 'Cloud Storage' : 'Google Drive',
       url: fileUrl,
       isLocalObject: false,
       updatedAt: 'Hari ini',
@@ -109,7 +112,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     await setFiles(updated, newFile, false);
 
     setUploadProgress(100);
-    setUploadStatusText('Selesai! Berkas Terhubung ke Folder Drive Proyek.');
+    setUploadStatusText('Selesai! Berkas Berhasil Disinkronkan ke Tim.');
 
     setTimeout(() => {
       setSelectedLocalFile(null);
@@ -119,22 +122,32 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       setUploadProgress(0);
       setUploadStatusText('');
       setShowUploadModal(false);
-      notify?.(`Berkas "${fileNameToUse}" berhasil terhubung ke Folder Google Drive Proyek! 🎉`, 'success');
+      if (isDirectDataStored) {
+        notify?.(`Berkas "${fileNameToUse}" berhasil diunggah & siap diunduh seluruh tim! 🎉`, 'success');
+      } else {
+        notify?.(`Catatan Berkas "${fileNameToUse}" berhasil dihubungkan ke Folder Drive Proyek! 🎉`, 'success');
+      }
     }, 500);
   };
 
   const getSafeFileUrl = (file) => {
     if (!file || !file.url) return DEFAULT_PROJECT_DRIVE_FOLDER;
-    if (file.url.startsWith('blob:') || file.url.includes('drive.google.com/file/preview?name=') || file.url.includes('drive.google.com/drive/search?q=')) {
+    const urlStr = String(file.url);
+    if (
+      urlStr.startsWith('blob:') ||
+      urlStr.includes('drive.google.com/file/preview?name=') ||
+      urlStr.includes('drive.google.com/drive/search?q=') ||
+      urlStr === 'https://drive.google.com'
+    ) {
       return DEFAULT_PROJECT_DRIVE_FOLDER;
     }
-    return file.url;
+    return urlStr;
   };
 
   const handleDownloadFile = (file, e) => {
     if (e) e.preventDefault();
 
-    if (file.url && file.url.startsWith('blob:')) {
+    if (file.url && String(file.url).startsWith('blob:')) {
       setBlobNoticeFile(file);
       return;
     }
@@ -371,6 +384,13 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
                   required
                 />
               </div>
+
+              {selectedLocalFile && selectedLocalFile.size >= 20 * 1024 * 1024 && (
+                <div style={{ background: 'var(--g-yellow-light)', padding: '12px 14px', borderRadius: 'var(--radius-md)', marginBottom: '14px', fontSize: '0.82rem', color: 'var(--text-primary)', border: '1px solid rgba(251, 188, 4, 0.5)' }}>
+                  <strong>📦 Berkas Berukuran Besar ({formatBytes(selectedLocalFile.size)}):</strong><br />
+                  Agar file fisiknya dapat diunduh oleh seluruh tim dari Google Drive, pastikan file dimasukkan ke <a href={DEFAULT_PROJECT_DRIVE_FOLDER} target="_blank" rel="noreferrer" style={{ fontWeight: 700, color: 'var(--g-blue)' }}>Folder Google Drive Proyek</a> lalu klik <strong>Unggah & Simpan Catatan</strong>.
+                </div>
+              )}
 
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '6px' }}>Link Share Google Drive (Opsional untuk File Berukuran Besar)</label>
