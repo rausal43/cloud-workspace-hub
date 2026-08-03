@@ -242,8 +242,8 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
             <HardDrive size={22} color="var(--g-blue)" />
           </div>
           <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Penyimpanan Google Drive Proyek</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{projectFiles.length} Berkas • Folder Shared Proyek Aktif</div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Penyimpanan Google Drive Proyek (Service Account Connected)</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{projectFiles.length} Berkas • Bot: firebase-adminsdk-fbsvc@project-management-31441.iam.gserviceaccount.com</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
