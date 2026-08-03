@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2, Loader2 } from 'lucide-react';
 import { isMatchProject } from '../hooks/useWorkspaceData';
-import { uploadFileToGoogleDrive, connectGoogleDriveAccount } from '../services/googleDriveService';
+import { uploadFileToGoogleDrive } from '../services/googleDriveService';
 
 const DEFAULT_PROJECT_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs?usp=sharing';
 
@@ -204,21 +204,6 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
         </div>
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={async () => {
-              try {
-                await connectGoogleDriveAccount();
-                notify?.('Akun Google Drive berhasil terhubung! 🎉', 'success');
-              } catch (e) {
-                notify?.('Izin Google Drive dibatalkan atau terblokir pop-up', 'error');
-              }
-            }}
-            style={{ fontSize: '0.85rem' }}
-          >
-            <HardDrive size={16} color="var(--g-blue)" /> Hubungkan Google Drive
-          </button>
-
           <a
             href="https://docs.google.com"
             target="_blank"
