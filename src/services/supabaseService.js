@@ -114,16 +114,22 @@ export const saveTodoToDb = async (todo, isDelete = false) => {
 };
 
 // ==========================================
-// 4. Chat Messages Service
+// 4. Chat Messages Service (Dual Table Naming Support)
 // ==========================================
 export const fetchChatMessagesFromDb = async () => {
-  const { data } = await runQuery(supabase.from('chatMessages').select('*'));
+  let { data, error } = await runQuery(supabase.from('chatMessages').select('*'));
+  if (error || !data) {
+    const fallback = await runQuery(supabase.from('chat_messages').select('*'));
+    if (fallback.data) data = fallback.data;
+  }
   return data || null;
 };
 
 export const saveChatMessageToDb = async (chatMsg, isDelete = false) => {
   if (isDelete) {
-    return await runQuery(supabase.from('chatMessages').delete().eq('id', chatMsg.id));
+    let res = await runQuery(supabase.from('chatMessages').delete().eq('id', chatMsg.id));
+    if (res.error) res = await runQuery(supabase.from('chat_messages').delete().eq('id', chatMsg.id));
+    return res;
   }
   const row = {
     id: chatMsg.id,
@@ -135,7 +141,11 @@ export const saveChatMessageToDb = async (chatMsg, isDelete = false) => {
     text: chatMsg.text,
     createdAt: chatMsg.createdAt || Date.now()
   };
-  return await runQuery(supabase.from('chatMessages').upsert(row));
+  let res = await runQuery(supabase.from('chatMessages').upsert(row));
+  if (res.error) {
+    res = await runQuery(supabase.from('chat_messages').upsert(row));
+  }
+  return res;
 };
 
 // ==========================================
