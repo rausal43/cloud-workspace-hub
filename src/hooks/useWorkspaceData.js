@@ -60,48 +60,33 @@ const safeSaveFilesToLocalStorage = (fileList) => {
   }
 };
 
+const getSavedJson = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.warn(`Failed to parse localStorage key ${key}:`, e);
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+  return fallback;
+};
+
 export function useWorkspaceData(currentUser) {
   // State initialization with LocalStorage fallbacks
-  const [projects, setProjects] = useState(() => {
-    const saved = localStorage.getItem('hub_projects');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-  });
+  const [projects, setProjects] = useState(() => getSavedJson('hub_projects', INITIAL_PROJECTS));
   const [activeProject, setActiveProject] = useState(() => {
     if (!currentUser) return null;
-    const saved = localStorage.getItem('hub_projects');
-    const allProjs = saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+    const allProjs = getSavedJson('hub_projects', INITIAL_PROJECTS);
     const allowed = allProjs.filter(p => isUserMemberOfProject(p, currentUser));
     return allowed[0] || null;
   });
-  const [activities, setActivities] = useState(() => {
-    const saved = localStorage.getItem('hub_activities');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('hub_messages');
-    return saved ? JSON.parse(saved) : INITIAL_MESSAGES;
-  });
-  const [todos, setTodos] = useState(() => {
-    const saved = localStorage.getItem('hub_todos');
-    return saved ? JSON.parse(saved) : INITIAL_TODOS;
-  });
-  const [chatMessages, setChatMessages] = useState(() => {
-    const saved = localStorage.getItem('hub_chat');
-    return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
-  });
-  const [files, setFiles] = useState(() => {
-    const saved = localStorage.getItem('hub_files');
-    return saved ? JSON.parse(saved) : INITIAL_FILES;
-  });
-  const [events, setEvents] = useState(() => {
-    const saved = localStorage.getItem('hub_events');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-  });
-  const [checkins, setCheckins] = useState(() => {
-    const saved = localStorage.getItem('hub_checkins');
-    return saved ? JSON.parse(saved) : INITIAL_CHECKINS;
-  });
+  const [activities, setActivities] = useState(() => getSavedJson('hub_activities', []));
+  const [messages, setMessages] = useState(() => getSavedJson('hub_messages', INITIAL_MESSAGES));
+  const [todos, setTodos] = useState(() => getSavedJson('hub_todos', INITIAL_TODOS));
+  const [chatMessages, setChatMessages] = useState(() => getSavedJson('hub_chat', INITIAL_CHAT_MESSAGES));
+  const [files, setFiles] = useState(() => getSavedJson('hub_files', INITIAL_FILES));
+  const [events, setEvents] = useState(() => getSavedJson('hub_events', INITIAL_EVENTS));
+  const [checkins, setCheckins] = useState(() => getSavedJson('hub_checkins', INITIAL_CHECKINS));
 
   // 1. Fetch & Realtime Sync from Supabase PostgreSQL
   useEffect(() => {
