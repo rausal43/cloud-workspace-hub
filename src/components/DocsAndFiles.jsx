@@ -72,7 +72,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     let isCloudUploaded = false;
 
     if (selectedLocalFile) {
-      setUploadStatusText('Mengunggah Berkas ke Google Cloud Storage...');
+      setUploadStatusText('Mengunggah Berkas ke Google Drive Cloud API...');
       try {
         fileUrl = await uploadFileToCloudStorage(selectedLocalFile, activeProject.id, (progressPct) => {
           setUploadProgress(Math.min(90, Math.max(20, progressPct)));
@@ -102,7 +102,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       name: fileNameToUse,
       type: detectedType,
       size: selectedLocalFile ? formatBytes(selectedLocalFile.size) : '1.5 MB',
-      source: isCloudUploaded ? 'Google Cloud Storage' : fileSource,
+      source: 'Google Drive',
       url: fileUrl,
       isLocalObject: false,
       updatedAt: 'Hari ini',
@@ -114,7 +114,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     await setFiles(updated, newFile, false);
 
     setUploadProgress(100);
-    setUploadStatusText('Selesai! Berkas Berhasil Terhubung.');
+    setUploadStatusText('Selesai! Berkas Berhasil Terhubung ke Google Drive.');
 
     setTimeout(() => {
       setSelectedLocalFile(null);
@@ -124,7 +124,7 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
       setUploadProgress(0);
       setUploadStatusText('');
       setShowUploadModal(false);
-      notify?.(`Berkas "${fileNameToUse}" berhasil terunggah ke Cloud Storage & disinkronkan! 🎉`, 'success');
+      notify?.(`Berkas "${fileNameToUse}" berhasil terunggah ke Google Drive & disinkronkan! 🎉`, 'success');
     }, 500);
   };
 
