@@ -73,29 +73,29 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     }
 
     let fileUrl = driveLinkInput.trim() || DEFAULT_PROJECT_DRIVE_FOLDER;
+    let isDriveUploaded = false;
 
     if (selectedLocalFile) {
-      setUploadStatusText('Mengunggah & Menyimpan Berkas ke Cloud Database Tim...');
-      setUploadProgress(30);
+      setUploadStatusText('Mengunggah Berkas Fisik ke Google Drive API...');
+      setUploadProgress(40);
 
       try {
-        fileUrl = await new Promise((resolve, reject) => {
+        const driveRes = await uploadFileToGoogleDrive(selectedLocalFile, activeProject.id, null, (pct) => {
+          setUploadProgress(Math.min(90, Math.max(30, pct)));
+        });
+        if (driveRes && driveRes.previewUrl) {
+          fileUrl = driveRes.previewUrl;
+          isDriveUploaded = true;
+        }
+      } catch (driveErr) {
+        console.warn('Physical Google Drive upload fallback:', driveErr);
+        setUploadStatusText('Menyimpan Berkas ke Cloud DB Tim...');
+        fileUrl = await new Promise((resolve) => {
           const reader = new FileReader();
-          
-          reader.onprogress = (evt) => {
-            if (evt.lengthComputable) {
-              const percent = Math.round((evt.loaded / evt.total) * 60) + 30;
-              setUploadProgress(percent);
-            }
-          };
-
           reader.onload = (ev) => resolve(ev.target.result);
-          reader.onerror = (err) => reject(err);
+          reader.onerror = () => resolve(DEFAULT_PROJECT_DRIVE_FOLDER);
           reader.readAsDataURL(selectedLocalFile);
         });
-      } catch (readErr) {
-        console.warn('FileReader error fallback:', readErr);
-        fileUrl = driveLinkInput.trim() || DEFAULT_PROJECT_DRIVE_FOLDER;
       }
     }
 
