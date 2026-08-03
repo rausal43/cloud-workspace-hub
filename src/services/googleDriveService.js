@@ -1,36 +1,26 @@
 /**
- * Google Drive API v3 Service
- * Physical file upload directly to shared Google Drive Folder: 15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs
+ * Google Drive API v3 Physical Upload Service
+ * Target Shared Google Drive Folder: 15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs
  */
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '947032579128-dtr8i18696ovrsi7gnk2pfmr8fr4c5po.apps.googleusercontent.com';
 const GOOGLE_DRIVE_FOLDER_ID = '15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs';
 
-let cachedAccessToken = null;
+let cachedAccessToken = localStorage.getItem('gdrive_access_token') || null;
 let tokenClient = null;
 
 /**
- * Requests an OAuth 2.0 Access Token from Google Identity Services
+ * Checks if user is connected to Google Drive API
  */
-export const requestGoogleAccessToken = () => {
+export const isGoogleDriveConnected = () => {
+  return Boolean(cachedAccessToken);
+};
+
+/**
+ * Explicitly connects user's Google Account to Google Drive API via OAuth 2.0 GIS
+ */
+export const connectGoogleDriveAccount = () => {
   return new Promise((resolve, reject) => {
-    if (cachedAccessToken) {
-      resolve(cachedAccessToken);
-      return;
-    }
-
-    const loadGsiScript = () => {
-      if (window.google?.accounts?.oauth2) {
-        initClient();
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.onload = () => initClient();
-        script.onerror = () => reject(new Error('GSI Script load failed'));
-        document.body.appendChild(script);
-      }
-    };
-
     const initClient = () => {
       try {
         tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -41,22 +31,39 @@ export const requestGoogleAccessToken = () => {
               reject(response);
             } else {
               cachedAccessToken = response.access_token;
+              try { localStorage.setItem('gdrive_access_token', response.access_token); } catch (e) {}
               resolve(response.access_token);
             }
           }
         });
-        tokenClient.requestAccessToken({ prompt: '' });
+        tokenClient.requestAccessToken({ prompt: 'consent' });
       } catch (err) {
         reject(err);
       }
     };
 
-    loadGsiScript();
+    if (window.google?.accounts?.oauth2) {
+      initClient();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.onload = () => initClient();
+      script.onerror = () => reject(new Error('GSI Script load failed'));
+      document.body.appendChild(script);
+    }
   });
 };
 
 /**
- * Uploads a physical local file directly to Google Drive API v3 inside the target folder
+ * Requests or retrieves current Google OAuth Access Token
+ */
+export const requestGoogleAccessToken = async () => {
+  if (cachedAccessToken) return cachedAccessToken;
+  return await connectGoogleDriveAccount();
+};
+
+/**
+ * Physical file upload directly into target Google Drive Folder (15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs)
  */
 export const uploadFileToGoogleDrive = async (file, projectId, accessToken = null, onProgress = null) => {
   let token = accessToken || cachedAccessToken;
@@ -85,6 +92,10 @@ export const uploadFileToGoogleDrive = async (file, projectId, accessToken = nul
 
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 401) {
+      cachedAccessToken = null;
+      try { localStorage.removeItem('gdrive_access_token'); } catch (e) {}
+    }
     throw new Error(`Google Drive API error (${response.status}): ${errText}`);
   }
 
