@@ -17,7 +17,7 @@ export function useLocalStorageState(key, defaultValue) {
     try {
       localStorage.setItem(key, JSON.stringify(state));
     } catch (err) {
-      console.warn(`Failed to save key "${key}" to localStorage:`, err);
+      console.warn(`Failed to save key "${key}" to localStorage (Quota or disabled):`, err);
     }
   }, [key, state]);
 

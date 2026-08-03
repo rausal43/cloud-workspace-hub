@@ -45,6 +45,21 @@ export function isUserMemberOfProject(project, user) {
   return project.members.some(m => m && m.email && m.email.trim().toLowerCase() === userEmail);
 }
 
+const safeSaveFilesToLocalStorage = (fileList) => {
+  try {
+    if (!Array.isArray(fileList)) return;
+    const sanitized = fileList.map(f => {
+      if (f && f.url && typeof f.url === 'string' && f.url.startsWith('data:') && f.url.length > 50000) {
+        return { ...f, url: 'https://drive.google.com/drive/folders/15XGKmxcWPcS5n9Vl1E4D5OOC6FMYllOs?usp=sharing' };
+      }
+      return f;
+    });
+    localStorage.setItem('hub_files', JSON.stringify(sanitized));
+  } catch (err) {
+    console.warn('LocalStorage quota warning for hub_files:', err);
+  }
+};
+
 export function useWorkspaceData(currentUser) {
   // State initialization with LocalStorage fallbacks
   const [projects, setProjects] = useState(() => {
@@ -145,7 +160,7 @@ export function useWorkspaceData(currentUser) {
           const dbIds = new Set(fileData.map(f => String(f.id)));
           const localOnly = prev.filter(f => f && f.id && !dbIds.has(String(f.id)));
           const merged = [...fileData, ...localOnly];
-          localStorage.setItem('hub_files', JSON.stringify(merged));
+          safeSaveFilesToLocalStorage(merged);
           return merged;
         });
       }
@@ -289,7 +304,7 @@ export function useWorkspaceData(currentUser) {
 
   const handleUpdateFiles = async (newList, updatedItem = null, isDelete = false) => {
     setFiles(newList);
-    localStorage.setItem('hub_files', JSON.stringify(newList));
+    safeSaveFilesToLocalStorage(newList);
     broadcastSync({ files: newList });
     if (updatedItem) dbService.saveFileToDb(updatedItem, isDelete);
   };
