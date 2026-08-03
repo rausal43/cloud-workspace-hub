@@ -60,8 +60,11 @@ export default function App() {
       return;
     }
     if (userProjects.length > 0) {
-      if (!activeProject || !userProjects.some(p => p.id === activeProject.id)) {
+      const matched = activeProject ? userProjects.find(p => p.id === activeProject.id || (p.name && activeProject.name && p.name.trim().toLowerCase() === activeProject.name.trim().toLowerCase())) : null;
+      if (!matched) {
         setActiveProject(userProjects[0]);
+      } else if (matched !== activeProject) {
+        setActiveProject(matched);
       }
     } else {
       setActiveProject(null);
