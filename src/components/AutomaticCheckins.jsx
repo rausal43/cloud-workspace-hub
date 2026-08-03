@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { HelpCircle, Plus, Send, Clock, User, CheckCircle2 } from 'lucide-react';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
-export default function AutomaticCheckins({ checkins, setCheckins, activeProject, currentUser, notify }) {
+export default function AutomaticCheckins({ checkins, setCheckins, activeProject, projects = [], currentUser, notify }) {
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSchedule, setNewSchedule] = useState('Setiap hari kerja jam 16:30');
@@ -79,7 +80,7 @@ export default function AutomaticCheckins({ checkins, setCheckins, activeProject
 
       {/* Questions Feed */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {checkins.filter(c => c.projectId === activeProject?.id).map(chk => (
+        {checkins.filter(c => isMatchProject(c.projectId, activeProject, projects)).map(chk => (
           <div key={chk.id} className="glass-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{chk.question}</h3>

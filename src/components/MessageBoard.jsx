@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Pin, Plus, Search, MessageCircle, User, Calendar, Tag, Edit3, Trash2, Settings, Check } from 'lucide-react';
 import { useLocalStorageState } from '../hooks/useLocalStorage';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
-export default function MessageBoard({ messages, setMessages, activeProject, currentUser, notify }) {
+export default function MessageBoard({ messages, setMessages, activeProject, projects = [], currentUser, notify }) {
   const [categories, setCategories] = useLocalStorageState('gcloud_message_categories', ['Pengumuman', 'Desain', 'Teknis', 'Pitch']);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +28,7 @@ export default function MessageBoard({ messages, setMessages, activeProject, cur
   const [commentText, setCommentText] = useState('');
 
   const filteredMessages = messages.filter(msg => {
-    const matchesProj = msg.projectId === activeProject?.id;
+    const matchesProj = isMatchProject(msg.projectId, activeProject, projects);
     const matchesCat = selectedCategory === 'Semua' || msg.category === selectedCategory;
     const matchesSearch = msg.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           msg.content.toLowerCase().includes(searchQuery.toLowerCase());

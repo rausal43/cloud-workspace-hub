@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Calendar as CalendarIcon, Plus, Clock, MapPin, CheckCircle, Edit3, Trash2, CheckSquare, Square, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
-export default function ScheduleCalendar({ events, setEvents, activeProject, currentUser, notify }) {
+export default function ScheduleCalendar({ events, setEvents, activeProject, projects = [], currentUser, notify }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -122,11 +123,9 @@ export default function ScheduleCalendar({ events, setEvents, activeProject, cur
     notify?.('Acara berhasil dihapus dari kalender', 'delete');
   };
 
-  // Filter events based on active project & hideCompleted
+  // Filter events based on active project & hideCompleted using isMatchProject helper
   const filteredEvents = events.filter(evt => {
-    const isMatchId = evt.projectId === activeProject?.id;
-    const isMatchName = activeProject?.name && String(evt.projectId).toLowerCase() === activeProject.name.toLowerCase();
-    if (!isMatchId && !isMatchName) return false;
+    if (!isMatchProject(evt.projectId, activeProject, projects)) return false;
     if (hideCompleted && evt.completed) return false;
     return true;
   });

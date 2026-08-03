@@ -12,14 +12,23 @@ import { supabase } from '../supabase';
 import * as dbService from '../services/supabaseService';
 
 export function isMatchProject(itemProjectId, activeProject, allProjects = []) {
-  if (!itemProjectId) return true;
-  if (!activeProject) return true;
+  if (!itemProjectId || !activeProject) return false;
   if (itemProjectId === activeProject.id) return true;
   
-  // Match by project name fallback if IDs differ between clients
-  if (activeProject.name) {
-    const itemProj = allProjects.find(p => p.id === itemProjectId);
-    if (itemProj && itemProj.name && itemProj.name.toLowerCase() === activeProject.name.toLowerCase()) {
+  const itemProjIdStr = String(itemProjectId).trim().toLowerCase();
+  const activeProjIdStr = activeProject.id ? String(activeProject.id).trim().toLowerCase() : '';
+  const activeProjNameStr = activeProject.name ? String(activeProject.name).trim().toLowerCase() : '';
+
+  if (activeProjIdStr && itemProjIdStr === activeProjIdStr) return true;
+  if (activeProjNameStr && itemProjIdStr === activeProjNameStr) return true;
+
+  if (activeProjNameStr && Array.isArray(allProjects)) {
+    const itemProj = allProjects.find(p => p && (
+      p.id === itemProjectId || 
+      (p.id && String(p.id).trim().toLowerCase() === itemProjIdStr) || 
+      (p.name && String(p.name).trim().toLowerCase() === itemProjIdStr)
+    ));
+    if (itemProj && itemProj.name && String(itemProj.name).trim().toLowerCase() === activeProjNameStr) {
       return true;
     }
   }

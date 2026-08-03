@@ -3,6 +3,7 @@ import { CheckSquare, Plus, Calendar, User, LayoutGrid, List, CheckCircle2, Circ
 import confetti from 'canvas-confetti';
 import TodoListKanban from './TodoListKanban';
 import { AddTaskModal, EditTaskModal, AddCategoryModal } from './TodoListModals';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
 export default function TodoList({ todos, setTodos, activeProject, projects = [], currentUser, notify }) {
   const [viewMode, setViewMode] = useState('list');
@@ -17,19 +18,7 @@ export default function TodoList({ todos, setTodos, activeProject, projects = []
   const [taskAssignee, setTaskAssignee] = useState(defaultAssignee);
   const [taskDueDate, setTaskDueDate] = useState('');
 
-  const isMatchProject = (projId) => {
-    if (!projId || !activeProject) return false;
-    if (projId === activeProject.id) return true;
-    if (activeProject.name && Array.isArray(projects)) {
-      const targetProj = projects.find(p => p.id === projId);
-      if (targetProj && targetProj.name && targetProj.name.toLowerCase() === activeProject.name.toLowerCase()) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const filteredTodos = todos.filter(cat => isMatchProject(cat.projectId));
+  const filteredTodos = todos.filter(cat => isMatchProject(cat.projectId, activeProject, projects));
 
   const handleToggleItem = (catId, itemId, e) => {
     if (e) e.stopPropagation();

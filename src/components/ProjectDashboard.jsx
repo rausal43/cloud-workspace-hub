@@ -11,9 +11,11 @@ import {
   ArrowRight,
   Activity
 } from 'lucide-react';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
 export default function ProjectDashboard({ 
   activeProject, 
+  projects = [],
   onSelectTab,
   messages,
   todos,
@@ -26,13 +28,13 @@ export default function ProjectDashboard({
 }) {
   if (!activeProject) return null;
 
-  // Filter core module items strictly for active project
-  const projectMessages = (messages || []).filter(m => m.projectId === activeProject.id);
-  const projectTodos = (todos || []).filter(t => t.projectId === activeProject.id);
-  const projectChatMessages = (chatMessages || []).filter(c => c.projectId === activeProject.id);
-  const projectEvents = (events || []).filter(e => e.projectId === activeProject.id);
-  const projectFiles = (files || []).filter(f => f.projectId === activeProject.id);
-  const projectCheckins = (checkins || []).filter(c => c.projectId === activeProject.id);
+  // Filter core module items strictly for active project using isMatchProject helper
+  const projectMessages = (messages || []).filter(m => isMatchProject(m.projectId, activeProject, projects));
+  const projectTodos = (todos || []).filter(t => isMatchProject(t.projectId, activeProject, projects));
+  const projectChatMessages = (chatMessages || []).filter(c => isMatchProject(c.projectId, activeProject, projects));
+  const projectEvents = (events || []).filter(e => isMatchProject(e.projectId, activeProject, projects));
+  const projectFiles = (files || []).filter(f => isMatchProject(f.projectId, activeProject, projects));
+  const projectCheckins = (checkins || []).filter(c => isMatchProject(c.projectId, activeProject, projects));
 
   // Calculate To-Do statistics for this project only
   let totalTasks = 0;

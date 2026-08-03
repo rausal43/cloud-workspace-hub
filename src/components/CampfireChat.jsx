@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, Paperclip, Smile, Hash, Users, Sparkles, Plus, Edit3, Trash2 } from 'lucide-react';
 import { useLocalStorageState } from '../hooks/useLocalStorage';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
 const INITIAL_CHANNELS = [
   { id: 'general', name: 'general', desc: 'Obrolan umum & koordinasi tim' },
@@ -8,7 +9,7 @@ const INITIAL_CHANNELS = [
   { id: 'design', name: 'design-system', desc: 'Wireframe, UI/UX & Feedback visual' }
 ];
 
-export default function CampfireChat({ chatMessages, setChatMessages, activeProject, currentUser, notify }) {
+export default function CampfireChat({ chatMessages, setChatMessages, activeProject, projects = [], currentUser, notify }) {
   const [channels, setChannels] = useLocalStorageState('gcloud_chat_channels', INITIAL_CHANNELS);
   const [activeChannel, setActiveChannel] = useState('general');
   const [textInput, setTextInput] = useState('');
@@ -225,7 +226,7 @@ export default function CampfireChat({ chatMessages, setChatMessages, activeProj
 
           {/* Messages Stream */}
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '8px' }}>
-            {chatMessages.filter(msg => msg.projectId === activeProject?.id && (!msg.channel || msg.channel === activeChannel)).map(msg => (
+            {chatMessages.filter(msg => isMatchProject(msg.projectId, activeProject, projects) && (!msg.channel || msg.channel === activeChannel)).map(msg => (
               <div key={msg.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <img 
                   src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender || 'User')}&background=0D8ABC&color=fff&bold=true`} 

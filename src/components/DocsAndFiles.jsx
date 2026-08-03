@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2 } from 'lucide-react';
+import { isMatchProject } from '../hooks/useWorkspaceData';
 
-export default function DocsAndFiles({ files, setFiles, activeProject, currentUser, notify }) {
+export default function DocsAndFiles({ files, setFiles, activeProject, projects = [], currentUser, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [fileSource, setFileSource] = useState('Google Drive');
   const [previewFile, setPreviewFile] = useState(null);
@@ -100,13 +101,8 @@ export default function DocsAndFiles({ files, setFiles, activeProject, currentUs
     notify?.('Berkas berhasil dihapus', 'delete');
   };
 
-  // Filter files strictly for current active project
-  const projectFiles = files.filter(f => {
-    if (!activeProject) return false;
-    const isMatchId = f.projectId === activeProject.id;
-    const isMatchName = activeProject.name && String(f.projectId).toLowerCase() === activeProject.name.toLowerCase();
-    return isMatchId || isMatchName;
-  });
+  // Filter files strictly for current active project using isMatchProject helper
+  const projectFiles = files.filter(f => isMatchProject(f.projectId, activeProject, projects));
 
   return (
     <div style={{ padding: '8px 0' }}>

@@ -13,7 +13,7 @@ import LoginModal from './components/LoginModal';
 import TeamManagerModal from './components/TeamManagerModal';
 import { NewProjectModal, EditProjectModal, DeleteProjectModal } from './components/ProjectModals';
 
-import { useWorkspaceData, isUserMemberOfProject } from './hooks/useWorkspaceData';
+import { useWorkspaceData, isUserMemberOfProject, isMatchProject } from './hooks/useWorkspaceData';
 import * as dbService from './services/supabaseService';
 import { Plus, Lock, LogIn } from 'lucide-react';
 
@@ -102,13 +102,7 @@ export default function App() {
 
   const isItemForActiveProject = (itemProjId) => {
     if (!currentUser || !activeProject) return false;
-    if (!itemProjId) return false;
-    if (itemProjId === activeProject.id) return true;
-    if (activeProject.name && Array.isArray(userProjects)) {
-      const proj = userProjects.find(p => p.id === itemProjId);
-      if (proj && proj.name && proj.name.toLowerCase() === activeProject.name.toLowerCase()) return true;
-    }
-    return false;
+    return isMatchProject(itemProjId, activeProject, userProjects);
   };
 
   const calculateUnreadCounts = () => {
@@ -380,6 +374,7 @@ export default function App() {
                   {activeTab === 'overview' && (
                     <ProjectDashboard
                       activeProject={activeProject}
+                      projects={userProjects}
                       onSelectTab={setActiveTab}
                       messages={messages}
                       todos={todos}
@@ -391,12 +386,12 @@ export default function App() {
                       activities={activities}
                     />
                   )}
-                  {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'messages' && <MessageBoard messages={messages} setMessages={handleUpdateMessages} activeProject={activeProject} projects={userProjects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
                   {activeTab === 'todos' && <TodoList todos={todos} setTodos={handleUpdateTodos} activeProject={activeProject} projects={userProjects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-                  {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} currentUser={currentUser} />}
-                  {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-                  {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} currentUser={currentUser} onAddActivity={handleAddActivity} />}
-                  {activeTab === 'standups' && <AutomaticCheckins checkins={checkins} setCheckins={handleUpdateCheckins} activeProject={activeProject} currentUser={currentUser} />}
+                  {activeTab === 'chat' && <CampfireChat chatMessages={chatMessages} setChatMessages={handleUpdateChatMessages} activeProject={activeProject} projects={userProjects} currentUser={currentUser} />}
+                  {activeTab === 'schedule' && <ScheduleCalendar events={events} setEvents={handleUpdateEvents} activeProject={activeProject} projects={userProjects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'files' && <DocsAndFiles files={files} setFiles={handleUpdateFiles} activeProject={activeProject} projects={userProjects} currentUser={currentUser} onAddActivity={handleAddActivity} />}
+                  {activeTab === 'standups' && <AutomaticCheckins checkins={checkins} setCheckins={handleUpdateCheckins} activeProject={activeProject} projects={userProjects} currentUser={currentUser} />}
                 </>
               ) : (
                 <div className="glass-card" style={{ textAlign: 'center', padding: '60px 24px', margin: '40px auto', maxWidth: '540px' }}>
