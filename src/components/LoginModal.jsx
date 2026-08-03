@@ -39,13 +39,15 @@ export default function LoginModal({ isOpen, onClose, currentUser, setCurrentUse
         }, 1200);
       } catch (err) {
         console.error("Google Sign-In Error:", err);
-        if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
+        const errMsg = String(err?.message || '');
+        const errCode = String(err?.code || '');
+        if (errCode === 'auth/configuration-not-found' || errCode === 'auth/operation-not-allowed') {
           alert("⚠️ Provider Google belum diaktifkan di Firebase Console.\n\nSilakan buka Firebase Console -> Authentication -> Sign-in method -> Tambahkan Provider Google & Aktifkan.");
-        } else if (err.code === 'auth/unauthorized-domain') {
+        } else if (errCode === 'auth/unauthorized-domain' || errMsg.includes('requests-from-referer') || errMsg.includes('are-blocked')) {
           const host = typeof window !== 'undefined' ? window.location.hostname : 'project.rasaraja.my.id';
-          alert(`⚠️ Domain ini (${host}) belum diizinkan di Firebase Console.\n\nSilakan buka Firebase Console -> Authentication -> Settings -> Authorized Domains -> Tambahkan domain ${host}`);
+          alert(`⚠️ Domain preview/custom ini (${host}) belum terdaftar di Firebase Authorized Domains.\n\nSilakan gunakan domain utama https://project.rasaraja.my.id atau login menggunakan Form Manual di bawah ini!`);
         } else {
-          alert(`Google Sign-In Error (${err.code || 'unknown'}): ${err.message}`);
+          alert(`Google Sign-In Info: Silakan gunakan domain utama https://project.rasaraja.my.id atau isi Form Manual di bawah.`);
         }
       }
     } else {
