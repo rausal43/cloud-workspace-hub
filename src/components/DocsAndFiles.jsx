@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FileText, Image, FileSpreadsheet, HardDrive, Plus, ExternalLink, Download, Upload, Eye, Trash2, File, CheckCircle2, Loader2 } from 'lucide-react';
 import { isMatchProject } from '../hooks/useWorkspaceData';
-import { uploadFileToCloudStorage } from '../services/firebaseStorageService';
+import { uploadFileToGoogleDrive } from '../services/googleDriveService';
 
 export default function DocsAndFiles({ files, setFiles, activeProject, projects = [], currentUser, notify }) {
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -69,17 +69,16 @@ export default function DocsAndFiles({ files, setFiles, activeProject, projects 
     }
 
     let fileUrl = driveLinkInput.trim() || 'https://drive.google.com';
-    let isCloudUploaded = false;
 
     if (selectedLocalFile) {
-      setUploadStatusText('Mengunggah Berkas ke Google Drive Cloud API...');
+      setUploadStatusText('Mengunggah Berkas ke Google Drive API...');
       try {
-        fileUrl = await uploadFileToCloudStorage(selectedLocalFile, activeProject.id, (progressPct) => {
-          setUploadProgress(Math.min(90, Math.max(20, progressPct)));
+        const driveResult = await uploadFileToGoogleDrive(selectedLocalFile, activeProject.id, null, (pct) => {
+          setUploadProgress(Math.min(90, Math.max(20, pct)));
         });
-        isCloudUploaded = true;
-      } catch (cloudErr) {
-        console.warn('Cloud Storage upload fallback:', cloudErr);
+        fileUrl = driveResult.previewUrl;
+      } catch (driveErr) {
+        console.warn('Google Drive direct upload fallback:', driveErr);
         if (selectedLocalFile.size < 20 * 1024 * 1024) {
           fileUrl = await new Promise((resolve) => {
             const reader = new FileReader();
